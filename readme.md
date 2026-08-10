@@ -1,7 +1,12 @@
 # Veritas Code
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Bash](https://img.shields.io/badge/Bash-1f425f?style=for-the-badge&logo=gnu-bash&logoColor=white) ![HTML5](https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white) ![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white) ![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
 
-An ultra lightweight, zero-lag, and locally run code editor for windows with minimal RAM footprint. It is fast, snappy and reliable. This can be used as a replacement for VSCode, Atom, Sublime Text if you don't need extensions. (Extension Marketplace will be added soon in v3.0)
+An ultra lightweight, zero-lag, and locally run code editor for all 3 major operating systems, boasting minimal RAM footprint. It is fast, snappy and reliable. This can be used as a replacement for VSCode, Atom, Sublime Text if you don't need extensions. (Extension Marketplace will be added soon in v3.0)
 
+## DISCLAIMER
+This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsable for any forks or copies of this software which may immitate any of the above mentioned items.
+
+ ![logo](assets/logofull.png) 
 ## FEATURES
 
 1. Native Dark Mode throughout the app
@@ -20,15 +25,20 @@ An ultra lightweight, zero-lag, and locally run code editor for windows with min
 | Shortcut|Description|
 |:---:|:---:|
 | Ctrl + N| New File|
-| Ctrl + shift + N | New Window|
+| Ctrl + Shift + N | New Window|
 | Ctrl + O | Open File |
 | Ctrl + K + O | Open Folder |
+| Ctrl + S | Save File |
+| Ctrl + Shift + S | Save As |
+| Alt + Shift + S | Save Copy As |
+| Ctrl + P | Print Window |
 | Ctrl + X | Cut Text |
 | Ctrl + C | Copy Text |
 | Ctrl + V | Paste Text |
-| Ctrl + F | Undo edit |
+| Ctrl + A | Select All Text |
+| Ctrl + Z | Undo edit |
 | Ctrl + Y | Redo edit |
-| Ctrl + ` | Open Bash / cmd|
+| Ctrl + ` | Open Terminal |
 
 ## DEPENDENCIES
 

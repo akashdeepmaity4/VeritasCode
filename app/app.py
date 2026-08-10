@@ -125,44 +125,42 @@ def create_file():
 
 @app.route('/open-terminal', methods=['POST'])
 def open_terminal():
+    data = request.json or {}
+    target_dir = data.get('dir') or os.path.expanduser('~')
+
+    if not os.path.exists(target_dir):
+        target_dir = os.path.expanduser('~')
+
     try:
         system = platform.system().lower()
 
         if system == 'windows':
-            bash_in_path = shutil.which('bash')
-            if bash_in_path:
-                subprocess.Popen(['start', 'bash'], shell=True)
-                return jsonify({'status': 'success', 'launched': 'bash'})
+            git_bash = shutil.which('bash') or r"C:\Program Files\Git\git-bash.exe"
+            if os.path.exists(git_bash):
+                subprocess.Popen([git_bash], cwd=target_dir)
+                return jsonify({'status': 'success', 'launched': 'git-bash'})
 
-            git_bash_candidates = [
-                r"C:\Program Files\Git\git-bash.exe",
-                r"C:\Program Files (x86)\Git\git-bash.exe",
-                os.path.expanduser(r"~\AppData\Local\Programs\Git\git-bash.exe")
-            ]
-
-            for git_bash in git_bash_candidates:
-                if os.path.exists(git_bash):
-                    subprocess.Popen([git_bash])
-                    return jsonify({'status': 'success', 'launched': 'git-bash'})
-
-            subprocess.Popen(['start', 'cmd'], shell=True)
+            subprocess.Popen('start cmd', shell=True, cwd=target_dir)
             return jsonify({'status': 'success', 'launched': 'cmd'})
 
         elif system == 'darwin':
-            subprocess.Popen(['open', '-a', 'Terminal'])
+            subprocess.Popen(['open', '-a', 'Terminal', target_dir])
             return jsonify({'status': 'success', 'launched': 'macOS Terminal'})
 
         else:
-            terminal = shutil.which('x-terminal-emulator') or shutil.which('gnome-terminal') or shutil.which('xterm')
-            if terminal:
-                subprocess.Popen([terminal])
-                return jsonify({'status': 'success', 'launched': terminal})
+            if shutil.which('gnome-terminal'):
+                subprocess.Popen(['gnome-terminal', f'--working-directory={target_dir}'])
+            elif shutil.which('x-terminal-emulator'):
+                subprocess.Popen(['x-terminal-emulator'], cwd=target_dir)
+            elif shutil.which('xterm'):
+                subprocess.Popen(['xterm'], cwd=target_dir)
             else:
-                return jsonify({'status': 'error', 'message': 'No supported terminal emulator found.'}), 404
+                return jsonify({'status': 'error', 'message': 'No supported terminal found'}), 404
+
+            return jsonify({'status': 'success', 'launched': 'linux-terminal'})
 
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
 
 @app.route('/create-folder', methods=['POST'])
 def create_folder():

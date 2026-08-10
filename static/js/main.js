@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // UI Elements
   const sidebar = document.getElementById('sidebar');
   const notesToggleBtn = document.getElementById('notesToggleBtn');
   const logoBtn = document.getElementById('logoBtn');
@@ -7,9 +8,54 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveFileBtn = document.getElementById('saveFileBtn');
   const activeFileName = document.getElementById('activeFileName');
 
+  // File Pickers
   const filePicker = document.getElementById('filePicker');
   const folderPicker = document.getElementById('folderPicker');
+  const nativeFilePicker = document.getElementById('native-file-picker');
 
+  // Header Dropdown Elements
+  const fileMenuBtn = document.getElementById('file-menu-btn');
+  const fileDropdown = document.getElementById('file-dropdown');
+  const editMenuBtn = document.getElementById('edit-menu-btn');
+  const editDropdown = document.getElementById('edit-dropdown');
+  const viewMenuBtn = document.getElementById('view-menu-btn');
+  const viewDropdown = document.getElementById('view-dropdown');
+  const settingsMenuBtn = document.getElementById('settings-menu-btn');
+  const settingsDropdown = document.getElementById('settings-dropdown');
+  const helpMenuBtn = document.getElementById('help-menu-btn');
+  const helpDropdown = document.getElementById('help-dropdown');
+  
+  const themeStatusText = document.getElementById('theme-status-text');
+  const linesStatusText = document.getElementById('lines-status-text');
+
+  // Settings Sub-Panel Elements
+  const fontSettingsToggle = document.getElementById('font-settings-toggle');
+  const fontSettingsPanel = document.getElementById('font-settings-panel');
+  const fontSizeInput = document.getElementById('fontSizeInput');
+  const applyFontSizeBtn = document.getElementById('applyFontSizeBtn');
+  const boldToggle = document.getElementById('boldToggle');
+  const italicToggle = document.getElementById('italicToggle');
+
+  // Base GitHub Repository URL
+  const GITHUB_REPO_URL = 'https://github.com/akashdeepmaity4/VeritasCode/blob/main';
+
+  // Line Numbers Sidebar Container Setup
+  const gridContainer = document.querySelector('.editor-grid-container');
+  let lineNumbersContainer = document.querySelector('.line-numbers');
+
+  if (gridContainer && !lineNumbersContainer) {
+    lineNumbersContainer = document.createElement('div');
+    lineNumbersContainer.className = 'line-numbers hidden';
+    lineNumbersContainer.contentEditable = 'false';
+    lineNumbersContainer.setAttribute('aria-hidden', 'true');
+    gridContainer.insertBefore(lineNumbersContainer, textCanvas);
+  }
+
+  // Set Default View Menu Labels
+  if (themeStatusText) themeStatusText.textContent = 'Enable Light Mode';
+  if (linesStatusText) linesStatusText.textContent = 'Show Line Numbers';
+
+  // Sidebar Action Buttons
   const actionButtons = document.querySelectorAll('.action-btn');
   let actionNewFile = null;
   let actionNewFolder = null;
@@ -19,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btn.textContent.includes('📁')) actionNewFolder = btn;
   });
 
+  // State Variables
   let currentRootDir = null;
   let selectedTargetDir = null;
   let currentFilePath = null;
@@ -40,10 +87,335 @@ document.addEventListener('DOMContentLoaded', () => {
     saveFileBtn.addEventListener('click', () => saveCurrentFile());
   }
 
-  // --- Canvas Behavior & Formatting ---
+  // --- Dropdown Navigation ---
+  function bindMenuToggle(btn, dropdown) {
+    if (!btn || !dropdown) return;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const container = btn.closest('.menu-dropdown-container');
+      const isHidden = dropdown.classList.contains('hidden');
+      closeAllDropdowns();
+      if (isHidden) {
+        dropdown.classList.remove('hidden');
+        if (container) container.classList.add('active');
+      }
+    });
+  }
+
+  bindMenuToggle(fileMenuBtn, fileDropdown);
+  bindMenuToggle(editMenuBtn, editDropdown);
+  bindMenuToggle(viewMenuBtn, viewDropdown);
+  bindMenuToggle(settingsMenuBtn, settingsDropdown);
+  bindMenuToggle(helpMenuBtn, helpDropdown);
+
+  document.addEventListener('click', () => closeAllDropdowns());
+
+  function closeAllDropdowns() {
+    document.querySelectorAll('.app-dropdown-menu').forEach(menu => menu.classList.add('hidden'));
+    document.querySelectorAll('.menu-dropdown-container').forEach(c => c.classList.remove('active'));
+    if (fontSettingsPanel) fontSettingsPanel.classList.add('hidden');
+  }
+
+  // Prevent dropdown closing when clicking inside font settings subpanel controls
+  if (fontSettingsPanel) {
+    fontSettingsPanel.addEventListener('click', (e) => e.stopPropagation());
+  }
+
+  // Toggle Font Settings Sub-Panel
+  if (fontSettingsToggle && fontSettingsPanel) {
+    fontSettingsToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fontSettingsPanel.classList.toggle('hidden');
+    });
+  }
+
+  // Apply Font Size
+  if (applyFontSizeBtn && fontSizeInput && textCanvas) {
+    applyFontSizeBtn.addEventListener('click', () => {
+      const size = fontSizeInput.value;
+      if (size && size >= 8 && size <= 72) {
+        textCanvas.style.fontSize = `${size}px`;
+      }
+    });
+  }
+
+  // Toggle Bold
+  if (boldToggle && textCanvas) {
+    boldToggle.addEventListener('change', (e) => {
+      textCanvas.style.fontWeight = e.target.checked ? 'bold' : 'normal';
+    });
+  }
+
+  // Toggle Italic
+  if (italicToggle && textCanvas) {
+    italicToggle.addEventListener('change', (e) => {
+      textCanvas.style.fontStyle = e.target.checked ? 'italic' : 'normal';
+    });
+  }
+
+  // --- File Dropdown Router ---
+  if (fileDropdown) {
+    fileDropdown.addEventListener('click', (e) => {
+      const item = e.target.closest('.dropdown-item');
+      if (!item || item.classList.contains('disabled')) return;
+
+      const action = item.dataset.action;
+      closeAllDropdowns();
+
+      switch (action) {
+        case 'new-file':
+          if (actionNewFile) actionNewFile.click();
+          else createNewFilePrompt();
+          break;
+        case 'open-file':
+          if (nativeFilePicker) nativeFilePicker.click();
+          else if (filePicker) filePicker.click();
+          break;
+        case 'save':
+          saveCurrentFile();
+          break;
+        case 'save-as':
+          triggerSaveAsFile();
+          break;
+        case 'save-copy-as':
+          triggerSaveCopyAsFile();
+          break;
+        case 'print-window':
+          window.print();
+          break;
+        case 'close-window':
+          resetEditorState();
+          break;
+        case 'exit-app':
+          if (window.pywebview) {
+            window.pywebview.api.close();
+          } else {
+            window.close();
+          }
+          break;
+      }
+    });
+  }
+
+  // --- Edit Dropdown Router ---
+  if (editDropdown) {
+    editDropdown.addEventListener('click', async (e) => {
+      const item = e.target.closest('.dropdown-item');
+      if (!item || item.classList.contains('disabled')) return;
+
+      const action = item.dataset.action;
+      closeAllDropdowns();
+
+      if (textCanvas) textCanvas.focus();
+
+      switch (action) {
+        case 'undo':
+          document.execCommand('undo');
+          break;
+        case 'redo':
+          document.execCommand('redo');
+          break;
+        case 'cut':
+          document.execCommand('cut');
+          break;
+        case 'copy':
+          document.execCommand('copy');
+          break;
+        case 'paste':
+          try {
+            const text = await navigator.clipboard.readText();
+            const formatted = text
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
+              .replace(/  /g, '&nbsp;&nbsp;')
+              .replace(/\n/g, '<br>');
+            document.execCommand('insertHTML', false, formatted);
+          } catch (err) {
+            document.execCommand('paste');
+          }
+          break;
+        case 'select-all':
+          document.execCommand('selectAll');
+          break;
+      }
+    });
+  }
+
+  // --- Line Numbers Generator ---
+  function updateLineNumbers() {
+    if (!lineNumbersContainer || lineNumbersContainer.classList.contains('hidden')) return;
+    if (!textCanvas) return;
+
+    const lines = textCanvas.innerHTML.split(/<div>|<br>|<p>/gi);
+    const lineCount = Math.max(1, lines.length);
+
+    let numsHtml = '';
+    for (let i = 1; i <= lineCount; i++) {
+      numsHtml += `<span>${i}</span>`;
+    }
+    lineNumbersContainer.innerHTML = numsHtml;
+  }
+
+  // --- View Dropdown Router ---
+  if (viewDropdown) {
+    viewDropdown.addEventListener('click', (e) => {
+      const item = e.target.closest('.dropdown-item');
+      if (!item || item.classList.contains('disabled')) return;
+
+      const action = item.dataset.action;
+      closeAllDropdowns();
+
+      switch (action) {
+        case 'toggle-theme':
+          const isLight = document.body.classList.toggle('root-light');
+          if (themeStatusText) {
+            themeStatusText.textContent = isLight ? 'Enable Dark Mode' : 'Enable Light Mode';
+          }
+          break;
+        case 'toggle-line-numbers':
+          if (lineNumbersContainer) {
+            const isVisible = lineNumbersContainer.classList.toggle('hidden');
+            const shown = !isVisible;
+            if (shown) updateLineNumbers();
+            if (linesStatusText) {
+              linesStatusText.textContent = shown ? 'Hide Line Numbers' : 'Show Line Numbers';
+            }
+          }
+          break;
+      }
+    });
+  }
+
+  // --- Help Dropdown Router ---
+  if (helpDropdown) {
+    helpDropdown.addEventListener('click', (e) => {
+      const item = e.target.closest('.dropdown-item');
+      if (!item || item.classList.contains('disabled')) return;
+
+      const action = item.dataset.action;
+      closeAllDropdowns();
+
+      let targetUrl = '';
+
+      switch (action) {
+        case 'setup-usage':
+          targetUrl = `${GITHUB_REPO_URL}/setupandusage.md`;
+          break;
+        case 'license':
+          targetUrl = `${GITHUB_REPO_URL}/LICENSE.md`;
+          break;
+        case 'faqs':
+          targetUrl = `${GITHUB_REPO_URL}/FAQs.md`;
+          break;
+      }
+
+      if (targetUrl) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+          window.pywebview.api.open_external_url(targetUrl);
+        } else {
+          window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        }
+      }
+    });
+  }
+
+  // Native File Picker Listener
+  if (nativeFilePicker) {
+    nativeFilePicker.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (file.name.startsWith('.git') || file.name.includes('/.git/')) {
+        alert('Accessing .git files is restricted.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const rawContent = event.target.result;
+        currentFileExt = file.name.split('.').pop().toLowerCase();
+
+        fetch('/format-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: rawContent, extension: currentFileExt })
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (activeFileName) activeFileName.textContent = file.name;
+            if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
+            currentFilePath = file.path || null;
+            updateLineNumbers();
+          });
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  function triggerSaveAsFile() {
+    const customPath = prompt("Enter full path to Save As:", currentFilePath || "");
+    if (!customPath) return;
+
+    fetch('/save-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: customPath,
+        content: textCanvas ? textCanvas.innerHTML : ''
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          currentFilePath = customPath;
+          const fileName = customPath.split(/[/\\]/).pop();
+          if (activeFileName) activeFileName.textContent = fileName;
+          alert('File saved successfully!');
+        } else {
+          alert(`Save Failed: ${data.message}`);
+        }
+      })
+      .catch(err => console.error('Error in save as:', err));
+  }
+
+  function triggerSaveCopyAsFile() {
+    const copyPath = prompt("Enter path to Save Copy As (current file session will remain open):", currentFilePath || "");
+    if (!copyPath) return;
+
+    fetch('/save-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: copyPath,
+        content: textCanvas ? textCanvas.innerHTML : ''
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Copy saved successfully! Original file remains active.');
+        } else {
+          alert(`Save Copy Failed: ${data.message}`);
+        }
+      })
+      .catch(err => console.error('Error in save copy as:', err));
+  }
+
+  function resetEditorState() {
+    currentFilePath = null;
+    currentFileExt = 'py';
+    if (activeFileName) activeFileName.textContent = 'No file open';
+    if (textCanvas) textCanvas.innerHTML = '';
+    updateLineNumbers();
+  }
+
+  // --- Canvas Behavior ---
   if (textCanvas) {
+    textCanvas.addEventListener('input', () => updateLineNumbers());
+
     textCanvas.addEventListener('keydown', (e) => {
-      // Tab key indentation
       if (e.key === 'Tab') {
         e.preventDefault();
         const sel = window.getSelection();
@@ -61,14 +433,14 @@ document.addEventListener('DOMContentLoaded', () => {
         range.setEndAfter(tabNode);
         sel.removeAllRanges();
         sel.addRange(range);
+        updateLineNumbers();
       }
     });
 
-    // Plain text paste handler
     textCanvas.addEventListener('paste', (e) => {
       e.preventDefault();
       const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-      
+
       const formatted = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -78,36 +450,52 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/\n/g, '<br>');
 
       document.execCommand('insertHTML', false, formatted);
+      updateLineNumbers();
     });
   }
 
-  // --- Global Keyboard Shortcuts ---
+  // --- Keyboard Shortcuts Listener ---
   document.addEventListener('keydown', (e) => {
     const isCtrl = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
 
-    // Ctrl + N: Create new file in root directory (Triggers existing '+' action)
+    // Alt + Shift + S: Save Copy As
+    if (e.altKey && e.shiftKey && key === 's') {
+      e.preventDefault();
+      triggerSaveCopyAsFile();
+      return;
+    }
+
+    // Ctrl + P: Print Window
+    if (isCtrl && key === 'p') {
+      e.preventDefault();
+      window.print();
+      return;
+    }
+
+    // Ctrl + Shift + S: Save As
+    if (isCtrl && e.shiftKey && key === 's') {
+      e.preventDefault();
+      triggerSaveAsFile();
+      return;
+    }
+
+    // Ctrl + N: New File
     if (isCtrl && !e.shiftKey && key === 'n') {
       e.preventDefault();
-      if (actionNewFile) {
-        actionNewFile.click();
-      } else {
-        createNewFilePrompt();
-      }
+      if (actionNewFile) actionNewFile.click();
+      else createNewFilePrompt();
       return;
     }
 
-    // Ctrl + Shift + N: Reset canvas to a fresh 'No file open' state
+    // Ctrl + Shift + N: Reset Editor Canvas
     if (isCtrl && e.shiftKey && key === 'n') {
       e.preventDefault();
-      currentFilePath = null;
-      currentFileExt = 'py';
-      if (activeFileName) activeFileName.textContent = 'No file open';
-      if (textCanvas) textCanvas.innerHTML = '';
+      resetEditorState();
       return;
     }
 
-    // Ctrl + ` : Launch default shell (Bash / CMD)
+    // Ctrl + ` : Launch Terminal
     if (isCtrl && (e.key === '`' || e.code === 'Backquote')) {
       e.preventDefault();
       fetch('/open-terminal', { method: 'POST' })
@@ -119,58 +507,46 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Ctrl + S: Save file
-    if (isCtrl && key === 's') {
+    // Ctrl + S: Save File
+    if (isCtrl && !e.shiftKey && key === 's') {
       e.preventDefault();
       saveCurrentFile();
       return;
     }
 
-    // Ctrl + Z: Undo inside editor
-    if (isCtrl && !e.shiftKey && key === 'z') {
-      if (document.activeElement === textCanvas) {
+    // Editor Text Controls
+    if (document.activeElement === textCanvas || (textCanvas && textCanvas.contains(document.activeElement))) {
+      if (isCtrl && !e.shiftKey && key === 'z') {
         e.preventDefault();
         document.execCommand('undo');
+        updateLineNumbers();
+        return;
       }
-      return;
-    }
-
-    // Ctrl + Y: Redo inside editor
-    if (isCtrl && key === 'y') {
-      if (document.activeElement === textCanvas) {
+      if (isCtrl && key === 'y') {
         e.preventDefault();
         document.execCommand('redo');
+        updateLineNumbers();
+        return;
       }
-      return;
-    }
-
-    // Ctrl + X: Cut selected text
-    if (isCtrl && key === 'x') {
-      if (document.activeElement === textCanvas) {
+      if (isCtrl && key === 'x') {
         e.preventDefault();
         document.execCommand('cut');
+        updateLineNumbers();
+        return;
       }
-      return;
-    }
-
-    // Ctrl + C: Copy selected text
-    if (isCtrl && key === 'c') {
-      if (document.activeElement === textCanvas) {
+      if (isCtrl && key === 'c') {
         e.preventDefault();
         document.execCommand('copy');
+        return;
       }
-      return;
-    }
-
-    // Ctrl + V: Paste text
-    if (isCtrl && key === 'v') {
-      if (document.activeElement === textCanvas) {
-        // Handled natively or by element paste listener
+      if (isCtrl && key === 'a') {
+        e.preventDefault();
+        document.execCommand('selectAll');
         return;
       }
     }
 
-    // Ctrl + K sequence handler (Ctrl+K -> Ctrl+O to open folder)
+    // Ctrl + K Chaining
     if (isCtrl && key === 'k') {
       e.preventDefault();
       ctrlKPressed = true;
@@ -179,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // File/Folder Picker Shortcuts
+    // Open Pickers
     if (key === 'o') {
       if (ctrlKPressed) {
         e.preventDefault();
@@ -187,12 +563,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (folderPicker) folderPicker.click();
       } else if (isCtrl) {
         e.preventDefault();
-        if (filePicker) filePicker.click();
+        if (nativeFilePicker) nativeFilePicker.click();
+        else if (filePicker) filePicker.click();
       }
     }
   });
 
-  // --- Header Execution Button ---
+  // --- Execution Icon Handler ---
   const toolIcons = document.querySelectorAll('.tool-icon');
   toolIcons.forEach(btn => {
     if (btn.textContent.includes('▶')) {
@@ -220,7 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // --- Pickers & Tree Generation ---
+  // --- Directory Actions & Tree ---
   if (filePicker) {
     filePicker.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -246,6 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (activeFileName) activeFileName.textContent = file.name;
             if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
             currentFilePath = file.path || null;
+            updateLineNumbers();
           });
       };
       reader.readAsText(file);
@@ -288,7 +666,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Directory Actions ---
   function createNewFilePrompt() {
     const fileName = prompt('Enter new file name:');
     if (!fileName) return;
@@ -397,6 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (activeFileName) activeFileName.textContent = key;
                 if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
                 currentFilePath = node.fileObj.path || null;
+                updateLineNumbers();
               });
           };
           reader.readAsText(node.fileObj);
@@ -441,7 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         path: currentFilePath,
-        content: textCanvas.innerHTML
+        content: textCanvas ? textCanvas.innerHTML : ''
       })
     })
       .then(res => res.json())

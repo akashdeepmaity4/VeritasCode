@@ -10,14 +10,141 @@
 
   <input type="file" id="filePicker" style="display: none;">
   <input type="file" id="folderPicker" webkitdirectory directory style="display: none;">
+  <input type="file" id="native-file-picker" style="display: none;">
 
   <header class="app-header">
     <span class="app-title">Veritas Code</span>
-    <button class="menu-item">File</button>
-    <button class="menu-item">Edit</button>
-    <button class="menu-item">View</button>
-    <button class="menu-item">Settings</button>
-    <button class="menu-item">Help</button>
+
+    <div class="menu-dropdown-container">
+      <button class="menu-item" id="file-menu-btn">File</button>
+      <div id="file-dropdown" class="app-dropdown-menu hidden">
+        <div class="dropdown-item" data-action="new-file">
+          <span>New File</span><span class="shortcut">Ctrl+N</span>
+        </div>
+        <div class="dropdown-item" data-action="open-file">
+          <span>Open...</span><span class="shortcut">Ctrl+O</span>
+        </div>
+        
+        <div class="dropdown-divider"></div>
+        
+        <div class="dropdown-item" data-action="save">
+          <span>Save</span><span class="shortcut">Ctrl+S</span>
+        </div>
+        <div class="dropdown-item" data-action="save-as">
+          <span>Save As...</span><span class="shortcut">Ctrl+Shift+S</span>
+        </div>
+        <div class="dropdown-item" data-action="save-copy-as">
+          <span>Save Copy As...</span><span class="shortcut">Alt+Shift+S</span>
+        </div>
+        
+        <div class="dropdown-divider"></div>
+        
+        <div class="dropdown-item" data-action="print-window">
+          <span>Print Window</span><span class="shortcut">Ctrl+P</span>
+        </div>
+        
+        <div class="dropdown-divider"></div>
+        
+        <div class="dropdown-item" data-action="close-window">
+          <span>Close Window</span><span class="shortcut">Alt+F4</span>
+        </div>
+        <div class="dropdown-item" data-action="exit-app">
+          <span>Exit</span><span class="shortcut">Ctrl+Q</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Menu Dropdown Wrapper -->
+    <div class="menu-dropdown-container">
+      <button class="menu-item" id="edit-menu-btn">Edit</button>
+      <div id="edit-dropdown" class="app-dropdown-menu hidden">
+        <div class="dropdown-item" data-action="undo">
+          <span>Undo</span><span class="shortcut">Ctrl+Z</span>
+        </div>
+        <div class="dropdown-item" data-action="redo">
+          <span>Redo</span><span class="shortcut">Ctrl+Y</span>
+        </div>
+        
+        <div class="dropdown-divider"></div>
+        
+        <div class="dropdown-item" data-action="cut">
+          <span>Cut</span><span class="shortcut">Ctrl+X</span>
+        </div>
+        <div class="dropdown-item" data-action="copy">
+          <span>Copy</span><span class="shortcut">Ctrl+C</span>
+        </div>
+        <div class="dropdown-item" data-action="paste">
+          <span>Paste</span><span class="shortcut">Ctrl+V</span>
+        </div>
+        
+        <div class="dropdown-divider"></div>
+        
+        <div class="dropdown-item" data-action="select-all">
+          <span>Select All</span><span class="shortcut">Ctrl+A</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Menu Dropdown Wrapper -->
+    <div class="menu-dropdown-container">
+      <button class="menu-item" id="view-menu-btn">View</button>
+      <div id="view-dropdown" class="app-dropdown-menu hidden">
+        <div class="dropdown-item" data-action="toggle-theme">
+          <span id="theme-status-text">Switch to Dark Mode</span>
+        </div>
+        
+        <div class="dropdown-divider"></div>
+        
+        <div class="dropdown-item" data-action="toggle-line-numbers">
+          <span id="lines-status-text">Hide Line Numbers</span>
+        </div>
+      </div>
+    </div>
+
+<!-- Settings Menu Dropdown Wrapper -->
+    <div class="menu-dropdown-container">
+      <button class="menu-item" id="settings-menu-btn">Settings</button>
+      <div id="settings-dropdown" class="app-dropdown-menu hidden">
+        <div class="dropdown-item" id="font-settings-toggle">
+          <span>Font Settings</span>
+          <span class="shortcut">▶</span>
+        </div>
+        
+        <!-- Font Settings Sub-Panel -->
+        <div id="font-settings-panel" class="settings-subpanel hidden">
+          <div class="setting-row">
+            <label for="fontSizeInput">Size (px):</label>
+            <input type="number" id="fontSizeInput" value="14" min="8" max="72">
+            <button id="applyFontSizeBtn" class="subpanel-btn">OK</button>
+          </div>
+          <div class="setting-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="boldToggle"> Bold
+            </label>
+          </div>
+          <div class="setting-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="italicToggle"> Italic
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+<!-- Help Menu Dropdown Wrapper -->
+    <div class="menu-dropdown-container">
+      <button class="menu-item" id="help-menu-btn">Help</button>
+      <div id="help-dropdown" class="app-dropdown-menu hidden">
+        <div class="dropdown-item" data-action="setup-usage">
+          <span>Setup and usage</span>
+        </div>
+        <div class="dropdown-item" data-action="license">
+          <span>LICENSE</span>
+        </div>
+        <div class="dropdown-item" data-action="faqs">
+          <span>FAQs</span>
+        </div>
+      </div>
+    </div>
   </header>
 
   <div class="app-body">
