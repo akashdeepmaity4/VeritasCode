@@ -6,7 +6,7 @@ An ultra lightweight, zero-lag, and locally run code editor for all 3 major oper
 ## DISCLAIMER
 This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsable for any forks or copies of this software which may immitate any of the above mentioned items.
 
- ![logo](assets/logofull.png) 
+ ![logo](assets/logofull.svg) 
 ## FEATURES
 
 1. Native Dark Mode throughout the app
