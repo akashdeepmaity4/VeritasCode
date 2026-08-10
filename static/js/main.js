@@ -13,6 +13,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const folderPicker = document.getElementById('folderPicker');
   const nativeFilePicker = document.getElementById('native-file-picker');
 
+  // Hidden Fallback File Picker for Save As (Browser Context)
+  let saveAsFallbackPicker = document.getElementById('saveAsFallbackPicker');
+  if (!saveAsFallbackPicker) {
+    saveAsFallbackPicker = document.createElement('input');
+    saveAsFallbackPicker.type = 'file';
+    saveAsFallbackPicker.id = 'saveAsFallbackPicker';
+    saveAsFallbackPicker.style.display = 'none';
+    saveAsFallbackPicker.setAttribute('nwsaveas', '');
+    document.body.appendChild(saveAsFallbackPicker);
+  }
+
   // Header Dropdown Elements
   const fileMenuBtn = document.getElementById('file-menu-btn');
   const fileDropdown = document.getElementById('file-dropdown');
@@ -70,9 +81,32 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedTargetDir = null;
   let currentFilePath = null;
   let currentFileExt = 'py';
+  let fileHandle = null;
 
   let ctrlKPressed = false;
   let ctrlKTimeout = null;
+
+  // --- Utility Functions ---
+  function normalizePath(pathStr) {
+    return pathStr ? pathStr.replace(/\\/g, '/') : null;
+  }
+
+  function sanitizeHTML(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
+      .replace(/  /g, '&nbsp;&nbsp;')
+      .replace(/\r?\n/g, '<br>');
+  }
+
+  function getPlainTextFromCanvas() {
+    if (!textCanvas) return '';
+    const temp = document.createElement('div');
+    temp.innerHTML = textCanvas.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<div>/gi, '\n').replace(/<\/div>/gi, '');
+    return temp.textContent || temp.innerText || '';
+  }
 
   // --- Sidebar Mechanics ---
   if (notesToggleBtn) {
@@ -116,12 +150,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fontSettingsPanel) fontSettingsPanel.classList.add('hidden');
   }
 
-  // Prevent dropdown closing when clicking inside font settings subpanel controls
   if (fontSettingsPanel) {
     fontSettingsPanel.addEventListener('click', (e) => e.stopPropagation());
   }
 
-  // Toggle Font Settings Sub-Panel
   if (fontSettingsToggle && fontSettingsPanel) {
     fontSettingsToggle.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -129,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Apply Font Size
   if (applyFontSizeBtn && fontSizeInput && textCanvas) {
     applyFontSizeBtn.addEventListener('click', () => {
       const size = fontSizeInput.value;
@@ -139,14 +170,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Toggle Bold
   if (boldToggle && textCanvas) {
     boldToggle.addEventListener('change', (e) => {
       textCanvas.style.fontWeight = e.target.checked ? 'bold' : 'normal';
     });
   }
 
-  // Toggle Italic
   if (italicToggle && textCanvas) {
     italicToggle.addEventListener('change', (e) => {
       textCanvas.style.fontStyle = e.target.checked ? 'italic' : 'normal';
@@ -187,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
           resetEditorState();
           break;
         case 'exit-app':
-          if (window.pywebview) {
+          if (window.pywebview && window.pywebview.api && window.pywebview.api.close) {
             window.pywebview.api.close();
           } else {
             window.close();
@@ -223,15 +252,13 @@ document.addEventListener('DOMContentLoaded', () => {
           break;
         case 'paste':
           try {
-            const text = await navigator.clipboard.readText();
-            const formatted = text
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
-              .replace(/  /g, '&nbsp;&nbsp;')
-              .replace(/\n/g, '<br>');
-            document.execCommand('insertHTML', false, formatted);
+            if (navigator.clipboard && navigator.clipboard.readText) {
+              const text = await navigator.clipboard.readText();
+              const formatted = sanitizeHTML(text);
+              document.execCommand('insertHTML', false, formatted);
+            } else {
+              document.execCommand('paste');
+            }
           } catch (err) {
             document.execCommand('paste');
           }
@@ -248,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!lineNumbersContainer || lineNumbersContainer.classList.contains('hidden')) return;
     if (!textCanvas) return;
 
-    const lines = textCanvas.innerHTML.split(/<div>|<br>|<p>/gi);
+    const lines = textCanvas.innerHTML.split(/<div>|<br\s*\/?>|<p>/gi);
     const lineCount = Math.max(1, lines.length);
 
     let numsHtml = '';
@@ -327,8 +354,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = e.target.files[0];
       if (!file) return;
 
-      if (file.name.startsWith('.git') || file.name.includes('/.git/')) {
+      const normalizedFileName = normalizePath(file.name);
+      if (normalizedFileName.startsWith('.git') || normalizedFileName.includes('/.git/')) {
         alert('Accessing .git files is restricted.');
+        nativeFilePicker.value = '';
         return;
       }
 
@@ -346,65 +375,177 @@ document.addEventListener('DOMContentLoaded', () => {
           .then(data => {
             if (activeFileName) activeFileName.textContent = file.name;
             if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-            currentFilePath = file.path || null;
+            currentFilePath = normalizePath(file.path) || null;
+            fileHandle = null;
             updateLineNumbers();
+          })
+          .finally(() => {
+            reader.onload = null;
+            nativeFilePicker.value = '';
           });
       };
       reader.readAsText(file);
     });
   }
 
-  function triggerSaveAsFile() {
-    const customPath = prompt("Enter full path to Save As:", currentFilePath || "");
-    if (!customPath) return;
+  // --- Save / Save As / Save Copy Helpers ---
+  async function saveCurrentFile() {
+    const plainContent = getPlainTextFromCanvas();
 
-    fetch('/save-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        path: customPath,
-        content: textCanvas ? textCanvas.innerHTML : ''
+    // 1. Direct Save via File System Access API (Browser Mode)
+    if (fileHandle) {
+      try {
+        const writable = await fileHandle.createWritable();
+        await writable.write(plainContent);
+        await writable.close();
+        return;
+      } catch (err) {
+        console.error('Error saving via File Handle:', err);
+      }
+    }
+
+    // 2. Direct Save via Backend / File Path (pywebview or local server context)
+    if (currentFilePath) {
+      fetch('/save-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: currentFilePath,
+          content: plainContent
+        })
       })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === 'success') {
-          currentFilePath = customPath;
-          const fileName = customPath.split(/[/\\]/).pop();
-          if (activeFileName) activeFileName.textContent = fileName;
-          alert('File saved successfully!');
-        } else {
-          alert(`Save Failed: ${data.message}`);
-        }
-      })
-      .catch(err => console.error('Error in save as:', err));
+        .then(res => res.json())
+        .then(data => {
+          if (data.status !== 'success') {
+            alert(`Save Failed: ${data.message}`);
+          }
+        })
+        .catch(err => console.error('Error saving file:', err));
+      return;
+    }
+
+    // 3. Fallback: Silent Auto-Download with current name (No prompt dialog shown)
+    const blob = new Blob([plainContent], { type: 'text/plain;charset=utf-8' });
+    const downloadLink = document.createElement('a');
+    const defaultName = activeFileName && activeFileName.textContent !== 'No file open' 
+      ? activeFileName.textContent 
+      : `untitled.${currentFileExt}`;
+
+    downloadLink.download = defaultName;
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.click();
+    URL.revokeObjectURL(downloadLink.href);
   }
 
-  function triggerSaveCopyAsFile() {
-    const copyPath = prompt("Enter path to Save Copy As (current file session will remain open):", currentFilePath || "");
-    if (!copyPath) return;
+  async function triggerSaveAsFile() {
+    let targetPath = null;
+    const plainContent = getPlainTextFromCanvas();
 
-    fetch('/save-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        path: copyPath,
-        content: textCanvas ? textCanvas.innerHTML : ''
+    // Option A: pywebview Native Dialog
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_file_dialog) {
+      targetPath = await window.pywebview.api.save_file_dialog();
+      if (!targetPath) return;
+      targetPath = normalizePath(targetPath);
+
+      fetch('/save-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: targetPath,
+          content: plainContent
+        })
       })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === 'success') {
-          alert('Copy saved successfully! Original file remains active.');
-        } else {
-          alert(`Save Copy Failed: ${data.message}`);
-        }
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            currentFilePath = targetPath;
+            fileHandle = null;
+            const fileName = targetPath.split('/').pop();
+            if (activeFileName) activeFileName.textContent = fileName;
+          } else {
+            alert(`Save Failed: ${data.message}`);
+          }
+        })
+        .catch(err => console.error('Error in save as:', err));
+      return;
+    }
+
+    // Option B: Standard Browser Mode (File System Access API)
+    if ('showSaveFilePicker' in window) {
+      try {
+        const defaultName = activeFileName && activeFileName.textContent !== 'No file open' 
+          ? activeFileName.textContent 
+          : `untitled.${currentFileExt}`;
+
+        const handle = await window.showSaveFilePicker({
+          suggestedName: defaultName
+        });
+        const writable = await handle.createWritable();
+        await writable.write(plainContent);
+        await writable.close();
+
+        fileHandle = handle;
+        currentFilePath = null;
+        if (activeFileName) activeFileName.textContent = handle.name;
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('File System Access API Save As failed:', err);
+      }
+    }
+
+    // Option C: Fallback Trigger
+    const blob = new Blob([plainContent], { type: 'text/plain;charset=utf-8' });
+    const downloadLink = document.createElement('a');
+    const defaultName = activeFileName ? activeFileName.textContent : `file.${currentFileExt}`;
+
+    downloadLink.download = defaultName !== 'No file open' ? defaultName : `untitled.${currentFileExt}`;
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.click();
+    URL.revokeObjectURL(downloadLink.href);
+  }
+
+  async function triggerSaveCopyAsFile() {
+    let copyPath = null;
+    const plainContent = getPlainTextFromCanvas();
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_file_dialog) {
+      copyPath = await window.pywebview.api.save_file_dialog();
+      if (!copyPath) return;
+      copyPath = normalizePath(copyPath);
+
+      fetch('/save-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: copyPath,
+          content: plainContent
+        })
       })
-      .catch(err => console.error('Error in save copy as:', err));
+        .then(res => res.json())
+        .then(data => {
+          if (data.status !== 'success') {
+            alert(`Save Copy Failed: ${data.message}`);
+          }
+        })
+        .catch(err => console.error('Error in save copy as:', err));
+      return;
+    }
+
+    // Browser Context
+    const blob = new Blob([plainContent], { type: 'text/plain;charset=utf-8' });
+    const downloadLink = document.createElement('a');
+    const defaultName = activeFileName ? activeFileName.textContent : `copy.${currentFileExt}`;
+
+    downloadLink.download = `copy_${defaultName !== 'No file open' ? defaultName : `untitled.${currentFileExt}`}`;
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.click();
+    URL.revokeObjectURL(downloadLink.href);
   }
 
   function resetEditorState() {
     currentFilePath = null;
+    fileHandle = null;
     currentFileExt = 'py';
     if (activeFileName) activeFileName.textContent = 'No file open';
     if (textCanvas) textCanvas.innerHTML = '';
@@ -419,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.key === 'Tab') {
         e.preventDefault();
         const sel = window.getSelection();
-        if (!sel.rangeCount) return;
+        if (!sel || !sel.rangeCount) return;
 
         const twoSpaceExts = ['html', 'htm', 'css', 'json', 'yaml', 'yml', 'js', 'ts'];
         const spaceCount = twoSpaceExts.includes(currentFileExt) ? 2 : 4;
@@ -439,15 +580,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     textCanvas.addEventListener('paste', (e) => {
       e.preventDefault();
-      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      const clipboardData = e.clipboardData || window.clipboardData;
+      if (!clipboardData) return;
 
-      const formatted = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
-        .replace(/  /g, '&nbsp;&nbsp;')
-        .replace(/\n/g, '<br>');
+      const text = clipboardData.getData('text/plain');
+      const formatted = sanitizeHTML(text);
 
       document.execCommand('insertHTML', false, formatted);
       updateLineNumbers();
@@ -480,6 +617,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Ctrl + S: Save File Directly
+    if (isCtrl && !e.shiftKey && key === 's') {
+      e.preventDefault();
+      saveCurrentFile();
+      return;
+    }
+
     // Ctrl + N: New File
     if (isCtrl && !e.shiftKey && key === 'n') {
       e.preventDefault();
@@ -504,13 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
           if (data.status !== 'success') alert(`Terminal Error: ${data.message}`);
         })
         .catch(err => console.error('Terminal execution error:', err));
-      return;
-    }
-
-    // Ctrl + S: Save File
-    if (isCtrl && !e.shiftKey && key === 's') {
-      e.preventDefault();
-      saveCurrentFile();
       return;
     }
 
@@ -560,6 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ctrlKPressed) {
         e.preventDefault();
         ctrlKPressed = false;
+        clearTimeout(ctrlKTimeout);
         if (folderPicker) folderPicker.click();
       } else if (isCtrl) {
         e.preventDefault();
@@ -603,8 +741,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = e.target.files[0];
       if (!file) return;
 
-      if (file.name.startsWith('.git') || file.name.includes('/.git/')) {
+      const normalizedFileName = normalizePath(file.name);
+      if (normalizedFileName.startsWith('.git') || normalizedFileName.includes('/.git/')) {
         alert('Accessing .git files is restricted.');
+        filePicker.value = '';
         return;
       }
 
@@ -622,8 +762,13 @@ document.addEventListener('DOMContentLoaded', () => {
           .then(data => {
             if (activeFileName) activeFileName.textContent = file.name;
             if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-            currentFilePath = file.path || null;
+            currentFilePath = normalizePath(file.path) || null;
+            fileHandle = null;
             updateLineNumbers();
+          })
+          .finally(() => {
+            reader.onload = null;
+            filePicker.value = '';
           });
       };
       reader.readAsText(file);
@@ -635,12 +780,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
 
-      const rootName = files[0].webkitRelativePath.split('/')[0];
+      const rootName = normalizePath(files[0].webkitRelativePath).split('/')[0];
       currentRootDir = rootName;
       const treeData = {};
 
       files.forEach(file => {
-        const relativePath = file.webkitRelativePath;
+        const relativePath = normalizePath(file.webkitRelativePath);
 
         if (relativePath.includes('/.git/') || relativePath.startsWith('.git/')) {
           return;
@@ -663,6 +808,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       renderNativeTreeUI(rootName, treeData);
+      folderPicker.value = '';
     });
   }
 
@@ -670,14 +816,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileName = prompt('Enter new file name:');
     if (!fileName) return;
 
-    if (fileName === '.git' || fileName.startsWith('.git/')) {
+    const normalizedName = normalizePath(fileName);
+    if (normalizedName === '.git' || normalizedName.startsWith('.git/')) {
       alert('Cannot create .git files.');
       return;
     }
 
     const target = selectedTargetDir || currentRootDir;
     if (!target) {
-      alert('Select or open a folder target first.');
+      triggerSaveAsFile();
       return;
     }
 
@@ -688,7 +835,16 @@ document.addEventListener('DOMContentLoaded', () => {
     })
       .then(res => res.json())
       .then(data => {
-        if (data.status !== 'success') alert(data.message);
+        if (data.status === 'success') {
+          currentFilePath = normalizePath(`${target}/${fileName}`);
+          fileHandle = null;
+          currentFileExt = fileName.split('.').pop().toLowerCase();
+          if (activeFileName) activeFileName.textContent = fileName;
+          if (textCanvas) textCanvas.innerHTML = '';
+          updateLineNumbers();
+        } else {
+          alert(data.message);
+        }
       });
   }
 
@@ -699,7 +855,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const folderName = prompt('Enter new folder name:');
       if (!folderName) return;
 
-      if (folderName === '.git') {
+      const normalizedFolder = normalizePath(folderName);
+      if (normalizedFolder === '.git') {
         alert('Cannot create .git folder.');
         return;
       }
@@ -724,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderNativeTreeUI(rootDirName, treeData) {
     if (!treeContainer) return;
-    treeContainer.innerHTML = '';
+    treeContainer.replaceChildren();
 
     const rootHeader = document.createElement('button');
     rootHeader.className = 'tree-folder';
@@ -773,8 +930,12 @@ document.addEventListener('DOMContentLoaded', () => {
               .then(data => {
                 if (activeFileName) activeFileName.textContent = key;
                 if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-                currentFilePath = node.fileObj.path || null;
+                currentFilePath = normalizePath(node.fileObj.path) || null;
+                fileHandle = null;
                 updateLineNumbers();
+              })
+              .finally(() => {
+                reader.onload = null;
               });
           };
           reader.readAsText(node.fileObj);
@@ -806,30 +967,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     return container;
-  }
-
-  function saveCurrentFile() {
-    if (!currentFilePath) {
-      alert('Cannot save: No physical file path linked to workspace.');
-      return;
-    }
-
-    fetch('/save-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        path: currentFilePath,
-        content: textCanvas ? textCanvas.innerHTML : ''
-      })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === 'success') {
-          alert('File saved successfully!');
-        } else {
-          alert(`Save Failed: ${data.message}`);
-        }
-      })
-      .catch(err => console.error('Error saving file:', err));
   }
 });
