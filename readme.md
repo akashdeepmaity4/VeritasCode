@@ -58,13 +58,13 @@ pip install -r requirements.txt
 
 ## HOW TO USE
 
-### 1. Windows Application (recommended for all windows users)
+### 1. Windows Application (Recommended for all windows users)
 
 1. Download the latest release from [here](https://github.com/VeritasSoftware/veritas-code/releases)
 
 (comming soon...)
 
-### 2. Progressive Webapp (recommended for Linux / Mac users)
+### 2. Progressive Webapp (Recommended for Linux / Mac users)
 
 1. Download the codebase.
 1. Run Bash or Cmd in root directory of the codebase.
@@ -75,15 +75,3 @@ pip install -r requirements.txt
 cd path/to/root/directory
 python launcher.py
 ```
-
-### 3. Locally Run Webapp (recommended for old devices or cloud users)
-
-1. Download the codebase. 
-1. Open Bash or Cmd. Go to the root directory of the downloaded codebase.
-1. Run 'app.py' via Python. 
-
-```
-cd path/to/root/directory
-python app.py
-```
-4. Open the browser and go to http://localhost:5000.

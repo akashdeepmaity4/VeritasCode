@@ -38,19 +38,6 @@ cd path/to/root/directory
 python launcher.py
 ```
 
-### For Old Devices or Cloud Users:
-
-OR
-
-- Download the codebase.
-- Run 'app.py' via Python.
-
-```
-cd path/to/root/directory
-python app.py
-```
-
-- Open the browser and go to http://localhost:5000.
 
 ## USAGE 
 
