@@ -6,7 +6,7 @@ An ultra lightweight, zero-lag, and locally run code editor for all 3 major oper
 ## ATTENTION! 
 This is a brief introduction to this project. For examples, details project explainations and implementation, refer to [Here](workflowandcontext.md)
 
-## DISCLAIMER
+## Trademark and Copyright prevention
 This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsable for any forks or copies of this software which may immitate any of the above mentioned items.
 
  ![logo](assets/logofull.svg) 
