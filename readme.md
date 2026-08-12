@@ -3,6 +3,9 @@
 
 An ultra lightweight, zero-lag, and locally run code editor for all 3 major operating systems, boasting minimal RAM footprint. It is fast, snappy and reliable. This can be used as a replacement for VSCode, Atom, Sublime Text if you don't need extensions. (Extension Marketplace will be added soon in v3.0)
 
+## ATTENTION! 
+This is a brief introduction to this project. For examples, details project explainations and implementation, refer to [Here](workflowandcontext.md)
+
 ## DISCLAIMER
 This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsable for any forks or copies of this software which may immitate any of the above mentioned items.
 
