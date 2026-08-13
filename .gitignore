@@ -1,3 +1,6 @@
+.env
+*.exe
+*.pyc
 context.md
 /__pycache__/
 *.spec
