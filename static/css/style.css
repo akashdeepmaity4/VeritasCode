@@ -3,8 +3,8 @@
   --bg-sidebar: #1e1e1e;
   --bg-hover: #2a2d2e;
   --bg-active: #37373d;
-  --vscode-blue: #007acc;
-  --vscode-blue-hover: #0098ff;
+  --veritas-blue: #007acc;
+  --veritas-blue-hover: #0098ff;
   --text-main: #cccccc;
   --text-muted: #858585;
   --border-color: #2b2b2b;
@@ -15,7 +15,7 @@
   --bg-secondary: #252526;
   --bg-active: #37373d;
   --text-main: #d4d4d4;
-  --text-muted: #858585;
+  --text-muted: #000000;
   --border-color: #333333;
   color-scheme: dark;
 }
@@ -47,7 +47,6 @@ body {
   overflow: hidden;
 }
 
-/* Header Section */
 .app-header {
   height: 30px;
   background-color: var(--bg-dark);
@@ -69,7 +68,7 @@ body {
 }
 
 .app-title:hover {
-  color: var(--vscode-blue);
+  color: var(--veritas-blue);
   transform: scale(1.07);
 }
 
@@ -87,14 +86,12 @@ body {
   border-radius: 4px;
 }
 
-/* App Body Layout */
 .app-body {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-/* Sidebar Section */
 .sidebar {
   width: 240px;
   background-color: var(--bg-sidebar);
@@ -121,7 +118,7 @@ body {
 .logo-icon {
   width: 20px;
   height: 20px;
-  fill: var(--vscode-blue);
+  fill: var(--veritas-blue);
   cursor: pointer;
   flex-shrink: 0;
   transition: transform 0.1s ease;
@@ -134,14 +131,14 @@ body {
 .sidebar-title {
   font-weight: bold;
   font-size: 16px;
-  color: var(--vscode-blue);
+  color: var(--veritas-blue);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
 }
 
 .sidebar-title:hover {
-  color: var(--vscode-blue-hover);
+  color: var(--veritas-blue-hover);
 }
 
 .sidebar.collapsed .sidebar-title,
@@ -198,11 +195,10 @@ body {
 
 .tree-file.active {
   background-color: var(--bg-active);
-  color: var(--vscode-blue-hover);
+  color: var(--veritas-blue-hover);
   font-weight: 500;
 }
 
-/* Workspace Main Layout */
 .workspace {
   flex: 1;
   display: flex;
@@ -268,7 +264,6 @@ body {
   background-color: var(--bg-hover);
 }
 
-/* Dropdown Menu Mechanics */
 .menu-dropdown-container {
   position: relative;
   display: inline-block;
@@ -325,7 +320,6 @@ body {
   margin: 3px 0;
 }
 
-/* Settings Subpanel Styling */
 .settings-subpanel {
   padding: 8px 12px;
   background-color: #ededed;
@@ -377,7 +371,6 @@ body {
   cursor: pointer;
 }
 
-/* Main Editor Flex Canvas Fixes */
 .editor-grid-container {
   flex: 1;
   padding: 20px;
@@ -423,11 +416,11 @@ body {
 }
 
 .text-canvas:focus {
-  border-color: var(--vscode-blue);
+  border-color: var(--veritas-blue);
 }
 
 .canvas-heading {
-  color: var(--vscode-blue);
+  color: var(--veritas-blue);
   font-size: 24px;
   margin-bottom: 15px;
   font-weight: bold;
