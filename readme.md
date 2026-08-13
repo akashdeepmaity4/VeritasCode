@@ -1,13 +1,15 @@
 # Veritas Code
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Bash](https://img.shields.io/badge/Bash-1f425f?style=for-the-badge&logo=gnu-bash&logoColor=white) ![HTML5](https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white) ![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white) ![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
 
-An ultra lightweight, zero-lag, and locally run code editor for all 3 major operating systems, boasting minimal RAM footprint. It is fast, snappy and reliable. This can be used as a replacement for VSCode, Atom, Sublime Text if you don't need extensions. (Extension Marketplace will be added soon in v3.0)
+An ultra lightweight, zero-lag, and locally run code editor for all 3 major operating systems, boasting minimal RAM footprint. It is fast, snappy and reliable. This can be used as a lite alternative to VS Code, Atom, Sublime Text if you don't need extensions. (Extension Marketplace will be added soon in v3.0)
 
 ## ATTENTION! 
-This is a brief introduction to this project. For examples, details project explainations and implementation, refer to [Here](workflowandcontext.md)
 
-## Trademark and Copyright prevention
-This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsable for any forks or copies of this software which may immitate any of the above mentioned items.
+This is a brief introduction to this project. To see examples, details, project explainations and implementation, refer to [Here](workflowandcontext.md)
+
+## Trademark and Copyright infringement prevention
+
+This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsible for any forks or copies of this software which may immitate any of the above mentioned items.
 
  ![logo](assets/logofull.svg) 
 ## FEATURES
@@ -25,7 +27,7 @@ This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or '
 
 ## SHORTCUTS
 
-| Shortcut|Description|
+| Shortcuts | Description|
 |:---:|:---:|
 | Ctrl + N| New File|
 | Ctrl + Shift + N | New Window|
