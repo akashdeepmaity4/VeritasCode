@@ -4,3 +4,7 @@
 context.md
 /__pycache__/
 *.spec
+.vscode/*
+!.vscode/settings.json
+*.log
+'Sample Note.md'
