@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsDropdown = document.getElementById('settings-dropdown');
   const helpMenuBtn = document.getElementById('help-menu-btn');
   const helpDropdown = document.getElementById('help-dropdown');
-  
+
   const themeStatusText = document.getElementById('theme-status-text');
   const linesStatusText = document.getElementById('lines-status-text');
 
@@ -103,9 +103,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getPlainTextFromCanvas() {
     if (!textCanvas) return '';
-    const temp = document.createElement('div');
-    temp.innerHTML = textCanvas.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<div>/gi, '\n').replace(/<\/div>/gi, '');
-    return temp.textContent || temp.innerText || '';
+    let text = textCanvas.innerText;
+    if (typeof text !== 'string') {
+      const temp = document.createElement('div');
+      temp.innerHTML = textCanvas.innerHTML
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<div>/gi, '\n')
+        .replace(/<\/div>/gi, '')
+        .replace(/<p>/gi, '\n')
+        .replace(/<\/p>/gi, '');
+      text = temp.textContent || temp.innerText || '';
+    }
+    return text.replace(/\u00A0/g, ' ');
   }
 
   // --- Sidebar Mechanics ---
@@ -375,7 +384,9 @@ document.addEventListener('DOMContentLoaded', () => {
           .then(data => {
             if (activeFileName) activeFileName.textContent = file.name;
             if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-            currentFilePath = normalizePath(file.path) || null;
+            currentFilePath = file.path
+              ? normalizePath(file.path)
+              : normalizePath(`${currentRootDir || '.'}/${file.name}`);
             fileHandle = null;
             updateLineNumbers();
           })
@@ -388,8 +399,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function showSaveIndicator() {
+    if (!saveFileBtn) return;
+    const originalBg = saveFileBtn.style.backgroundColor;
+    saveFileBtn.style.backgroundColor = '#28a745';
+    setTimeout(() => {
+      saveFileBtn.style.backgroundColor = originalBg;
+    }, 600);
+  }
+
   // --- Save / Save As / Save Copy Helpers ---
-  async function saveCurrentFile() {
+  async function saveCurrentFile(isAutoSave = false) {
     const plainContent = getPlainTextFromCanvas();
 
     // 1. Direct Save via File System Access API (Browser Mode)
@@ -398,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const writable = await fileHandle.createWritable();
         await writable.write(plainContent);
         await writable.close();
+        if (!isAutoSave) showSaveIndicator();
         return;
       } catch (err) {
         console.error('Error saving via File Handle:', err);
@@ -416,25 +437,23 @@ document.addEventListener('DOMContentLoaded', () => {
       })
         .then(res => res.json())
         .then(data => {
-          if (data.status !== 'success') {
-            alert(`Save Failed: ${data.message}`);
+          if (data.status === 'success') {
+            if (!isAutoSave) showSaveIndicator();
+          } else {
+            if (!isAutoSave) alert(`Save Failed: ${data.message}`);
           }
         })
-        .catch(err => console.error('Error saving file:', err));
+        .catch(err => {
+          console.error('Error saving file:', err);
+          if (!isAutoSave) alert(`Save Failed: ${err}`);
+        });
       return;
     }
 
-    // 3. Fallback: Silent Auto-Download with current name (No prompt dialog shown)
-    const blob = new Blob([plainContent], { type: 'text/plain;charset=utf-8' });
-    const downloadLink = document.createElement('a');
-    const defaultName = activeFileName && activeFileName.textContent !== 'No file open' 
-      ? activeFileName.textContent 
-      : `untitled.${currentFileExt}`;
-
-    downloadLink.download = defaultName;
-    downloadLink.href = URL.createObjectURL(blob);
-    downloadLink.click();
-    URL.revokeObjectURL(downloadLink.href);
+    // 3. Fallback: If no current file path or file handle and NOT auto-save, trigger Save As
+    if (!isAutoSave) {
+      triggerSaveAsFile();
+    }
   }
 
   async function triggerSaveAsFile() {
@@ -462,6 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fileHandle = null;
             const fileName = targetPath.split('/').pop();
             if (activeFileName) activeFileName.textContent = fileName;
+            showSaveIndicator();
           } else {
             alert(`Save Failed: ${data.message}`);
           }
@@ -473,20 +493,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Option B: Standard Browser Mode (File System Access API)
     if ('showSaveFilePicker' in window) {
       try {
-        const defaultName = activeFileName && activeFileName.textContent !== 'No file open' 
-          ? activeFileName.textContent 
+        const defaultName = activeFileName && activeFileName.textContent !== 'No file open'
+          ? activeFileName.textContent
           : `untitled.${currentFileExt}`;
-
         const handle = await window.showSaveFilePicker({
           suggestedName: defaultName
         });
         const writable = await handle.createWritable();
         await writable.write(plainContent);
         await writable.close();
-
         fileHandle = handle;
         currentFilePath = null;
         if (activeFileName) activeFileName.textContent = handle.name;
+        showSaveIndicator();
         return;
       } catch (err) {
         if (err.name === 'AbortError') return;
@@ -494,15 +513,42 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Option C: Fallback Trigger
-    const blob = new Blob([plainContent], { type: 'text/plain;charset=utf-8' });
-    const downloadLink = document.createElement('a');
-    const defaultName = activeFileName ? activeFileName.textContent : `file.${currentFileExt}`;
+    // Option C: Fallback Prompt to save to backend / workspace
+    const defaultName = activeFileName && activeFileName.textContent !== 'No file open'
+      ? activeFileName.textContent
+      : `untitled.${currentFileExt}`;
+    const fileNamePrompt = prompt('Save file as:', defaultName);
+    if (!fileNamePrompt) return;
 
-    downloadLink.download = defaultName !== 'No file open' ? defaultName : `untitled.${currentFileExt}`;
-    downloadLink.href = URL.createObjectURL(blob);
-    downloadLink.click();
-    URL.revokeObjectURL(downloadLink.href);
+    const targetDir = currentRootDir || '.';
+    const targetPathStr = normalizePath(`${targetDir}/${fileNamePrompt}`);
+
+    fetch('/save-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: targetPathStr,
+        content: plainContent
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          currentFilePath = targetPathStr;
+          fileHandle = null;
+          if (activeFileName) activeFileName.textContent = fileNamePrompt;
+          showSaveIndicator();
+        } else {
+          // Download fallback
+          const blob = new Blob([plainContent], { type: 'text/plain;charset=utf-8' });
+          const downloadLink = document.createElement('a');
+          downloadLink.download = fileNamePrompt;
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.click();
+          URL.revokeObjectURL(downloadLink.href);
+        }
+      })
+      .catch(err => console.error('Error in save fallback:', err));
   }
 
   async function triggerSaveCopyAsFile() {
@@ -552,9 +598,22 @@ document.addEventListener('DOMContentLoaded', () => {
     updateLineNumbers();
   }
 
+  let autoSaveTimeout = null;
+  function triggerAutoSave() {
+    if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(() => {
+      if (currentFilePath || fileHandle) {
+        saveCurrentFile(true);
+      }
+    }, 1000);
+  }
+
   // --- Canvas Behavior ---
   if (textCanvas) {
-    textCanvas.addEventListener('input', () => updateLineNumbers());
+    textCanvas.addEventListener('input', () => {
+      updateLineNumbers();
+      triggerAutoSave();
+    });
 
     textCanvas.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') {
@@ -762,7 +821,9 @@ document.addEventListener('DOMContentLoaded', () => {
           .then(data => {
             if (activeFileName) activeFileName.textContent = file.name;
             if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-            currentFilePath = normalizePath(file.path) || null;
+            currentFilePath = file.path
+              ? normalizePath(file.path)
+              : normalizePath(`${currentRootDir || '.'}/${file.name}`);
             fileHandle = null;
             updateLineNumbers();
           })
@@ -930,7 +991,10 @@ document.addEventListener('DOMContentLoaded', () => {
               .then(data => {
                 if (activeFileName) activeFileName.textContent = key;
                 if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-                currentFilePath = normalizePath(node.fileObj.path) || null;
+                const pathVal = node.fileObj ? (node.fileObj.path || node.fileObj.webkitRelativePath) : null;
+                currentFilePath = pathVal
+                  ? normalizePath(pathVal)
+                  : normalizePath(`${currentRootDir || '.'}/${key}`);
                 fileHandle = null;
                 updateLineNumbers();
               })

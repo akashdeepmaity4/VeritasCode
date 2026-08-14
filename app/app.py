@@ -20,7 +20,7 @@ def index():
 def format_content():
     data = request.get_json() or {}
     raw_content = data.get('content', '')
-    
+
     # Basic HTML escaping for safe canvas rendering
     escaped = (
         raw_content
@@ -55,7 +55,7 @@ def read_file():
 def save_file():
     data = request.get_json() or {}
     file_path = data.get('path', '')
-    raw_html = data.get('content', '')
+    raw_content = data.get('content', '')
 
     if is_git_restricted(file_path):
         return jsonify({'status': 'error', 'message': 'Modifying .git files is restricted.'}), 403
@@ -63,9 +63,11 @@ def save_file():
     if not file_path:
         return jsonify({'status': 'error', 'message': 'Invalid file path.'}), 400
 
-    # Sanitize innerHTML back to plain text
+    # Sanitize content: replace non-breaking spaces and HTML entities if any
     clean_text = (
-        raw_html
+        raw_content
+        .replace('\xa0', ' ')
+        .replace('\u00a0', ' ')
         .replace('<div>', '\n')
         .replace('</div>', '')
         .replace('<p>', '\n')

@@ -1,10 +1,9 @@
 # Veritas Code
-
-![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)![Bash](https://img.shields.io/badge/Bash-1f425f?style=for-the-badge&logo=gnu-bash&logoColor=white)![HTML5](https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white)![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white)![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Bash](https://img.shields.io/badge/Bash-1f425f?style=for-the-badge&logo=gnu-bash&logoColor=white) ![HTML5](https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white) ![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white) ![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
 
 An ultra lightweight, zero-lag, and locally run code editor for all 3 major operating systems, boasting minimal RAM footprint. It is fast, snappy and reliable. This can be used as a lite alternative to VS Code, Atom, Sublime Text if you don't need extensions. (Extension Marketplace will be added soon in v3.0)
 
-## ATTENTION!
+## ATTENTION! 
 
 This is a brief introduction to this project. To see examples, details, project explainations and implementation, refer to [Here](workflowandcontext.md)
 
@@ -12,27 +11,26 @@ This is a brief introduction to this project. To see examples, details, project 
 
 This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsible for any forks or copies of this software which may immitate any of the above mentioned items.
 
-![logo](assets/logofull.svg)
-
+ ![logo](assets/logofull.svg) 
 ## FEATURES
 
 1. Native Dark Mode throughout the app
-2. Sidebar and toolbar similar to popular IDEs 
-3. Very small size and RAM footprint
-4. Custom indentation for each Language
+1. Sidebar and toolbar similar to popular IDEs 
+1. Very small size and RAM footprint
+1. Custom indentation for each Language
 
 ## HIGHLIGHTS
 
 1. Can be run on all devices, from old legacy devices to modern powerhorses
-2. Can be used on Localhost, natively as a Webapp, or a full-pledged windows app
-3. Data stays on your Drive (Your WIFI company may still get the metadata during localhost use)
+1. Can be used on Localhost, natively as a Webapp, or a full-pledged windows app
+1. Data stays on your Drive (Your WIFI company may still get the metadata during localhost use)
 
 ## SHORTCUTS
 
-| Shortcuts | Description |
+| Shortcuts | Description|
 |:---:|:---:|
-| Ctrl + N | New File |
-| Ctrl + Shift + N | New Window |
+| Ctrl + N| New File|
+| Ctrl + Shift + N | New Window|
 | Ctrl + O | Open File |
 | Ctrl + K + O | Open Folder |
 | Ctrl + S | Save File |
@@ -55,11 +53,13 @@ This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or '
 - Pyinstaller (For Windows Application)
 - Bash (required for Linux / Mac, highly recommended for Windows)
 
+
 ## INSTALL DEPENDENCIES
 
 ```
 pip install -r requirements.txt
 ```
+
 
 ## HOW TO USE
 
@@ -72,12 +72,11 @@ pip install -r requirements.txt
 ### 2. Progressive Webapp (Recommended for Linux / Mac users)
 
 1. Download the codebase.
-2. Run Bash or Cmd in root directory of the codebase.
-3. install the dependencies [refer to line 36]
-4. run 'launcher.py' to launch the PWA (entire codebase should be downloaded to prevent any errors)
+1. Run Bash or Cmd in root directory of the codebase.
+1. install the dependencies [refer to line 36]
+1. run 'launcher.py' to launch the PWA (entire codebase should be downloaded to prevent any errors)
 
 ```
 cd path/to/root/directory
 python launcher.py
 ```
-
