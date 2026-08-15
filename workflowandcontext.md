@@ -39,6 +39,18 @@ root-folder/
 
 ## 2. Core Functional Requirements & Rules
 
+### Editor Text Formatting and Canvas:
+
+1. Monaco Editor integration (@main.js)
+
+### AI Integration:
+
+1. Built an API/Local Model configuration panel (@apiform.html) with:
+
+- sanitized inputs
+- folder scanning for local models
+- persistent floating popup window.
+
 ### Theme & Colors:
 
 1. Dark background theme matching VS Code design language (#181818 app background, #1e1e1e sidebar).

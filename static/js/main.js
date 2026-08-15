@@ -86,35 +86,180 @@ document.addEventListener('DOMContentLoaded', () => {
   let ctrlKPressed = false;
   let ctrlKTimeout = null;
 
+  let monacoEditor = null;
+  let isMonacoReady = false;
+  let pendingContent = null;
+  let pendingFileName = null;
+
+  // --- Monaco Language Mapping ---
+  function getMonacoLanguage(ext) {
+    if (!ext) return 'plaintext';
+    const cleanExt = ext.toLowerCase().replace(/^\./, '');
+    const map = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'py': 'python',
+      'pyw': 'python',
+      'html': 'html',
+      'htm': 'html',
+      'css': 'css',
+      'scss': 'scss',
+      'less': 'less',
+      'json': 'json',
+      'md': 'markdown',
+      'markdown': 'markdown',
+      'c': 'c',
+      'h': 'c',
+      'cpp': 'cpp',
+      'hpp': 'cpp',
+      'cc': 'cpp',
+      'java': 'java',
+      'sh': 'shell',
+      'bash': 'shell',
+      'zsh': 'shell',
+      'yml': 'yaml',
+      'yaml': 'yaml',
+      'xml': 'xml',
+      'sql': 'sql',
+      'php': 'php',
+      'rb': 'ruby',
+      'go': 'go',
+      'rs': 'rust',
+      'cs': 'csharp',
+      'bat': 'bat',
+      'ps1': 'powershell',
+      'ini': 'ini',
+      'dockerfile': 'dockerfile',
+      'txt': 'plaintext'
+    };
+    return map[cleanExt] || 'plaintext';
+  }
+
+  // --- Initialize Monaco Editor ---
+  function initMonacoEditor() {
+    if (typeof require !== 'undefined' && require.config) {
+      require.config({
+        paths: {
+          vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs'
+        }
+      });
+
+      require(['vs/editor/editor.main'], function () {
+        const container = document.getElementById('textCanvas');
+        if (!container) return;
+
+        const isLight = document.body.classList.contains('root-light');
+
+        monacoEditor = monaco.editor.create(container, {
+          value: pendingContent !== null ? pendingContent : '',
+          language: pendingFileName ? getMonacoLanguage(pendingFileName) : 'python',
+          theme: isLight ? 'vs' : 'vs-dark',
+          automaticLayout: true,
+          fontSize: 14,
+          minimap: { enabled: true },
+          scrollBeyondLastLine: false,
+          renderWhitespace: 'selection',
+          lineNumbers: 'on',
+          tabSize: 4,
+          insertSpaces: true,
+          fontFamily: "'Consolas', 'Courier New', monospace"
+        });
+
+        isMonacoReady = true;
+
+        if (pendingContent !== null) {
+          setEditorContent(pendingContent, pendingFileName);
+          pendingContent = null;
+          pendingFileName = null;
+        }
+
+        monacoEditor.onDidChangeModelContent(() => {
+          triggerAutoSave();
+        });
+
+        // Add keyboard command shortcuts directly to Monaco
+        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+          saveCurrentFile();
+        });
+
+        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, () => {
+          triggerSaveAsFile();
+        });
+
+        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyN, () => {
+          if (actionNewFile) actionNewFile.click();
+          else createNewFilePrompt();
+        });
+
+        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO, () => {
+          if (nativeFilePicker) nativeFilePicker.click();
+          else if (filePicker) filePicker.click();
+        });
+      });
+    }
+  }
+
+  initMonacoEditor();
+
   // --- Utility Functions ---
+  
+  async function handleJsonResponse(res) {
+    const contentType = res ? res.headers.get('content-type') || '' : '';
+    if (contentType.includes('application/json')) {
+      try {
+        return await res.json();
+      } catch (e) {
+        return { status: 'error', message: 'Invalid JSON response from server.' };
+      }
+    }
+    const text = res ? await res.text() : '';
+    console.warn('Non-JSON response received:', text);
+    return {
+      status: 'error',
+      message: `Server returned non-JSON response (HTTP ${res ? res.status : 'unknown'})`
+    };
+  }
+
   function normalizePath(pathStr) {
     return pathStr ? pathStr.replace(/\\/g, '/') : null;
   }
 
-  function sanitizeHTML(text) {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
-      .replace(/  /g, '&nbsp;&nbsp;')
-      .replace(/\r?\n/g, '<br>');
+  function setEditorContent(content, fileNameOrPath) {
+    const text = content || '';
+    let ext = 'py';
+    if (fileNameOrPath) {
+      ext = fileNameOrPath.includes('.') ? fileNameOrPath.split('.').pop() : fileNameOrPath;
+    }
+    const lang = getMonacoLanguage(ext);
+
+    if (monacoEditor && isMonacoReady) {
+      monacoEditor.setValue(text);
+      const model = monacoEditor.getModel();
+      if (model) {
+        monaco.editor.setModelLanguage(model, lang);
+      }
+    } else {
+      pendingContent = text;
+      pendingFileName = fileNameOrPath || 'py';
+      if (textCanvas && !monacoEditor) {
+        textCanvas.textContent = text;
+      }
+    }
   }
 
   function getPlainTextFromCanvas() {
-    if (!textCanvas) return '';
-    let text = textCanvas.innerText;
-    if (typeof text !== 'string') {
-      const temp = document.createElement('div');
-      temp.innerHTML = textCanvas.innerHTML
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<div>/gi, '\n')
-        .replace(/<\/div>/gi, '')
-        .replace(/<p>/gi, '\n')
-        .replace(/<\/p>/gi, '');
-      text = temp.textContent || temp.innerText || '';
+    if (monacoEditor && isMonacoReady) {
+      return monacoEditor.getValue();
     }
-    return text.replace(/\u00A0/g, ' ');
+    if (pendingContent !== null) {
+      return pendingContent;
+    }
+    if (textCanvas) {
+      return textCanvas.innerText || textCanvas.textContent || '';
+    }
+    return '';
   }
 
   // --- Sidebar Mechanics ---
@@ -170,24 +315,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (applyFontSizeBtn && fontSizeInput && textCanvas) {
+  if (applyFontSizeBtn && fontSizeInput) {
     applyFontSizeBtn.addEventListener('click', () => {
-      const size = fontSizeInput.value;
+      const size = parseInt(fontSizeInput.value, 10);
       if (size && size >= 8 && size <= 72) {
-        textCanvas.style.fontSize = `${size}px`;
+        if (monacoEditor && isMonacoReady) {
+          monacoEditor.updateOptions({ fontSize: size });
+        }
       }
     });
   }
 
-  if (boldToggle && textCanvas) {
+  if (boldToggle) {
     boldToggle.addEventListener('change', (e) => {
-      textCanvas.style.fontWeight = e.target.checked ? 'bold' : 'normal';
+      if (monacoEditor && isMonacoReady) {
+        monacoEditor.updateOptions({ fontWeight: e.target.checked ? 'bold' : 'normal' });
+      }
     });
   }
 
-  if (italicToggle && textCanvas) {
+  if (italicToggle) {
     italicToggle.addEventListener('change', (e) => {
-      textCanvas.style.fontStyle = e.target.checked ? 'italic' : 'normal';
+      // Monaco handles font styling dynamically
     });
   }
 
@@ -244,14 +393,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const action = item.dataset.action;
       closeAllDropdowns();
 
-      if (textCanvas) textCanvas.focus();
+      if (monacoEditor && isMonacoReady) {
+        monacoEditor.focus();
+      }
 
       switch (action) {
         case 'undo':
-          document.execCommand('undo');
+          if (monacoEditor && isMonacoReady) monacoEditor.trigger('menu', 'undo', null);
+          else document.execCommand('undo');
           break;
         case 'redo':
-          document.execCommand('redo');
+          if (monacoEditor && isMonacoReady) monacoEditor.trigger('menu', 'redo', null);
+          else document.execCommand('redo');
           break;
         case 'cut':
           document.execCommand('cut');
@@ -263,8 +416,16 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             if (navigator.clipboard && navigator.clipboard.readText) {
               const text = await navigator.clipboard.readText();
-              const formatted = sanitizeHTML(text);
-              document.execCommand('insertHTML', false, formatted);
+              if (monacoEditor && isMonacoReady) {
+                const selection = monacoEditor.getSelection();
+                monacoEditor.executeEdits('paste', [{
+                  range: selection,
+                  text: text,
+                  forceMoveMarkers: true
+                }]);
+              } else {
+                document.execCommand('insertText', false, text);
+              }
             } else {
               document.execCommand('paste');
             }
@@ -273,25 +434,20 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           break;
         case 'select-all':
-          document.execCommand('selectAll');
+          if (monacoEditor && isMonacoReady) {
+            const model = monacoEditor.getModel();
+            if (model) monacoEditor.setSelection(model.getFullModelRange());
+          } else {
+            document.execCommand('selectAll');
+          }
           break;
       }
     });
   }
 
-  // --- Line Numbers Generator ---
+  // --- Line Numbers Generator (Legacy fallback) ---
   function updateLineNumbers() {
-    if (!lineNumbersContainer || lineNumbersContainer.classList.contains('hidden')) return;
-    if (!textCanvas) return;
-
-    const lines = textCanvas.innerHTML.split(/<div>|<br\s*\/?>|<p>/gi);
-    const lineCount = Math.max(1, lines.length);
-
-    let numsHtml = '';
-    for (let i = 1; i <= lineCount; i++) {
-      numsHtml += `<span>${i}</span>`;
-    }
-    lineNumbersContainer.innerHTML = numsHtml;
+    // Monaco editor manages line numbers internally
   }
 
   // --- View Dropdown Router ---
@@ -309,14 +465,18 @@ document.addEventListener('DOMContentLoaded', () => {
           if (themeStatusText) {
             themeStatusText.textContent = isLight ? 'Enable Dark Mode' : 'Enable Light Mode';
           }
+          if (monacoEditor && isMonacoReady) {
+            monaco.editor.setTheme(isLight ? 'vs' : 'vs-dark');
+          }
           break;
         case 'toggle-line-numbers':
-          if (lineNumbersContainer) {
-            const isVisible = lineNumbersContainer.classList.toggle('hidden');
-            const shown = !isVisible;
-            if (shown) updateLineNumbers();
+          if (monacoEditor && isMonacoReady) {
+            const opt = monacoEditor.getOption(monaco.editor.EditorOption.lineNumbers);
+            const isOff = opt.renderType === 0;
+            const newSetting = isOff ? 'on' : 'off';
+            monacoEditor.updateOptions({ lineNumbers: newSetting });
             if (linesStatusText) {
-              linesStatusText.textContent = shown ? 'Hide Line Numbers' : 'Show Line Numbers';
+              linesStatusText.textContent = newSetting === 'on' ? 'Hide Line Numbers' : 'Show Line Numbers';
             }
           }
           break;
@@ -374,28 +534,16 @@ document.addEventListener('DOMContentLoaded', () => {
       reader.onload = (event) => {
         const rawContent = event.target.result;
         currentFileExt = file.name.split('.').pop().toLowerCase();
-
-        fetch('/format-content', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: rawContent, extension: currentFileExt })
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (activeFileName) activeFileName.textContent = file.name;
-            if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-            currentFilePath = file.path
-              ? normalizePath(file.path)
-              : normalizePath(`${currentRootDir || '.'}/${file.name}`);
-            fileHandle = null;
-            updateLineNumbers();
-          })
-          .finally(() => {
-            reader.onload = null;
-            nativeFilePicker.value = '';
-          });
+        if (activeFileName) activeFileName.textContent = file.name;
+        currentFilePath = file.path
+          ? normalizePath(file.path)
+          : normalizePath(`${currentRootDir || '.'}/${file.name}`);
+        fileHandle = null;
+        setEditorContent(rawContent, file.name);
       };
+
       reader.readAsText(file);
+      nativeFilePicker.value = '';
     });
   }
 
@@ -435,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
           content: plainContent
         })
       })
-        .then(res => res.json())
+        .then(handleJsonResponse)
         .then(data => {
           if (data.status === 'success') {
             if (!isAutoSave) showSaveIndicator();
@@ -474,7 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
           content: plainContent
         })
       })
-        .then(res => res.json())
+        .then(handleJsonResponse)
         .then(data => {
           if (data.status === 'success') {
             currentFilePath = targetPath;
@@ -531,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
         content: plainContent
       })
     })
-      .then(res => res.json())
+      .then(handleJsonResponse)
       .then(data => {
         if (data.status === 'success') {
           currentFilePath = targetPathStr;
@@ -568,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
           content: plainContent
         })
       })
-        .then(res => res.json())
+        .then(handleJsonResponse)
         .then(data => {
           if (data.status !== 'success') {
             alert(`Save Copy Failed: ${data.message}`);
@@ -594,8 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fileHandle = null;
     currentFileExt = 'py';
     if (activeFileName) activeFileName.textContent = 'No file open';
-    if (textCanvas) textCanvas.innerHTML = '';
-    updateLineNumbers();
+    setEditorContent('', 'py');
   }
 
   let autoSaveTimeout = null;
@@ -702,7 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isCtrl && (e.key === '`' || e.code === 'Backquote')) {
       e.preventDefault();
       fetch('/open-terminal', { method: 'POST' })
-        .then(res => res.json())
+        .then(handleJsonResponse)
         .then(data => {
           if (data.status !== 'success') alert(`Terminal Error: ${data.message}`);
         })
@@ -781,7 +928,7 @@ document.addEventListener('DOMContentLoaded', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: currentFilePath })
         })
-          .then(res => res.json())
+          .then(handleJsonResponse)
           .then(data => {
             if (data.status === 'error') {
               alert(`Execution Error: ${data.message}`);
@@ -811,28 +958,16 @@ document.addEventListener('DOMContentLoaded', () => {
       reader.onload = (event) => {
         const rawContent = event.target.result;
         currentFileExt = file.name.split('.').pop().toLowerCase();
-
-        fetch('/format-content', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: rawContent, extension: currentFileExt })
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (activeFileName) activeFileName.textContent = file.name;
-            if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-            currentFilePath = file.path
-              ? normalizePath(file.path)
-              : normalizePath(`${currentRootDir || '.'}/${file.name}`);
-            fileHandle = null;
-            updateLineNumbers();
-          })
-          .finally(() => {
-            reader.onload = null;
-            filePicker.value = '';
-          });
+        if (activeFileName) activeFileName.textContent = file.name;
+        currentFilePath = file.path
+          ? normalizePath(file.path)
+          : normalizePath(`${currentRootDir || '.'}/${file.name}`);
+        fileHandle = null;
+        setEditorContent(rawContent, file.name);
       };
+
       reader.readAsText(file);
+      filePicker.value = '';
     });
   }
 
@@ -894,15 +1029,14 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target_dir: target, name: fileName })
     })
-      .then(res => res.json())
+      .then(handleJsonResponse)
       .then(data => {
         if (data.status === 'success') {
           currentFilePath = normalizePath(`${target}/${fileName}`);
           fileHandle = null;
           currentFileExt = fileName.split('.').pop().toLowerCase();
           if (activeFileName) activeFileName.textContent = fileName;
-          if (textCanvas) textCanvas.innerHTML = '';
-          updateLineNumbers();
+          setEditorContent('', fileName);
         } else {
           alert(data.message);
         }
@@ -933,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_dir: target, name: folderName })
       })
-        .then(res => res.json())
+        .then(handleJsonResponse)
         .then(data => {
           if (data.status !== 'success') alert(data.message);
         });
@@ -982,25 +1116,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const rawContent = event.target.result;
             currentFileExt = key.split('.').pop().toLowerCase();
 
-            fetch('/format-content', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ content: rawContent, extension: currentFileExt })
-            })
-              .then(res => res.json())
-              .then(data => {
-                if (activeFileName) activeFileName.textContent = key;
-                if (textCanvas) textCanvas.innerHTML = data.content || rawContent;
-                const pathVal = node.fileObj ? (node.fileObj.path || node.fileObj.webkitRelativePath) : null;
-                currentFilePath = pathVal
-                  ? normalizePath(pathVal)
-                  : normalizePath(`${currentRootDir || '.'}/${key}`);
-                fileHandle = null;
-                updateLineNumbers();
-              })
-              .finally(() => {
-                reader.onload = null;
-              });
+            if (activeFileName) activeFileName.textContent = key;
+            const pathVal = node.fileObj ? (node.fileObj.path || node.fileObj.webkitRelativePath) : null;
+            currentFilePath = pathVal
+              ? normalizePath(pathVal)
+              : normalizePath(`${currentRootDir || '.'}/${key}`);
+            fileHandle = null;
+            setEditorContent(rawContent, key);
           };
           reader.readAsText(node.fileObj);
         });
@@ -1032,4 +1154,381 @@ document.addEventListener('DOMContentLoaded', () => {
 
     return container;
   }
+
+  // --- AI Model & API Hub (apiform.html) & Floating Popup Logic ---
+  const aiModalBtn = document.getElementById('aiModalBtn');
+  const apiformOverlay = document.getElementById('apiformOverlay');
+  const apiFormCloseBtn = document.getElementById('apiFormCloseBtn');
+
+  const btnExternalApi = document.getElementById('btnExternalApi');
+  const btnLocalModel = document.getElementById('btnLocalModel');
+  const sectionExternalApi = document.getElementById('sectionExternalApi');
+  const sectionLocalModel = document.getElementById('sectionLocalModel');
+
+  const apiProviderSelect = document.getElementById('apiProviderSelect');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const toggleApiKeyVisBtn = document.getElementById('toggleApiKeyVisBtn');
+  const btnConnectApi = document.getElementById('btnConnectApi');
+
+  const localModelPathInput = document.getElementById('localModelPathInput');
+  const btnBrowseLocalModel = document.getElementById('btnBrowseLocalModel');
+  const btnLoadLocalModel = document.getElementById('btnLoadLocalModel');
+
+  const btnEnlightenMe = document.getElementById('btnEnlightenMe');
+  const folderPickerLocal = document.getElementById('folderPickerLocal');
+  const enlightenResultsArea = document.getElementById('enlightenResultsArea');
+  const foundModelsSelect = document.getElementById('foundModelsSelect');
+  const btnUseFoundModel = document.getElementById('btnUseFoundModel');
+
+  const apiFormStatus = document.getElementById('apiFormStatus');
+
+  // Floating Popup Elements
+  const aiFloatingPopup = document.getElementById('aiFloatingPopup');
+  const aiPopupHeader = document.getElementById('aiPopupHeader');
+  const aiPopupTitle = document.getElementById('aiPopupTitle');
+  const aiPopupCloseBtn = document.getElementById('aiPopupCloseBtn');
+  const aiPopupConfigBtn = document.getElementById('aiPopupConfigBtn');
+  const aiPopupBody = document.getElementById('aiPopupBody');
+  const aiPopupInput = document.getElementById('aiPopupInput');
+  const aiPopupSendBtn = document.getElementById('aiPopupSendBtn');
+
+  let isAiConfigured = false;
+  let activeAiProvider = 'AI Assistant';
+  let activeAiKey = '';
+  let activeModelPath = '';
+
+  function sanitizeInput(text) {
+    if (typeof text !== 'string') return '';
+    return text
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/`/g, '&#x60;')
+      .trim();
+  }
+
+  // Reactively open AI Hub or Floating Assistant on clicking '✦' button
+  if (aiModalBtn) {
+    aiModalBtn.addEventListener('click', (e) => {
+      if (e.shiftKey) {
+        if (apiformOverlay) apiformOverlay.classList.remove('hidden');
+        return;
+      }
+
+      if (isAiConfigured && aiFloatingPopup) {
+        if (aiFloatingPopup.classList.contains('hidden')) {
+          aiFloatingPopup.classList.remove('hidden');
+        } else {
+          if (apiformOverlay) apiformOverlay.classList.remove('hidden');
+        }
+      } else {
+        if (apiformOverlay) apiformOverlay.classList.remove('hidden');
+      }
+    });
+  }
+
+  if (apiFormCloseBtn && apiformOverlay) {
+    apiFormCloseBtn.addEventListener('click', () => {
+      apiformOverlay.classList.add('hidden');
+    });
+  }
+
+  if (aiPopupConfigBtn && apiformOverlay) {
+    aiPopupConfigBtn.addEventListener('click', () => {
+      apiformOverlay.classList.remove('hidden');
+    });
+  }
+
+  if (btnExternalApi && btnLocalModel) {
+    btnExternalApi.addEventListener('click', () => {
+      btnExternalApi.classList.add('active');
+      btnLocalModel.classList.remove('active');
+      if (sectionExternalApi) sectionExternalApi.classList.remove('hidden');
+      if (sectionLocalModel) sectionLocalModel.classList.add('hidden');
+    });
+
+    btnLocalModel.addEventListener('click', () => {
+      btnLocalModel.classList.add('active');
+      btnExternalApi.classList.remove('active');
+      if (sectionLocalModel) sectionLocalModel.classList.remove('hidden');
+      if (sectionExternalApi) sectionExternalApi.classList.add('hidden');
+    });
+  }
+
+  if (toggleApiKeyVisBtn && apiKeyInput) {
+    toggleApiKeyVisBtn.addEventListener('click', () => {
+      if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text';
+        toggleApiKeyVisBtn.textContent = 'Hide';
+      } else {
+        apiKeyInput.type = 'password';
+        toggleApiKeyVisBtn.textContent = 'Show';
+      }
+    });
+  }
+
+  if (btnConnectApi) {
+    btnConnectApi.addEventListener('click', () => {
+      const provider = sanitizeInput(apiProviderSelect ? apiProviderSelect.value : '');
+      const apiKey = sanitizeInput(apiKeyInput ? apiKeyInput.value : '');
+
+      if (!provider || !apiKey) {
+        if (apiFormStatus) {
+          apiFormStatus.className = 'apiform-status error';
+          apiFormStatus.textContent = 'Please select a provider and enter your API key.';
+        }
+        return;
+      }
+
+      fetch('/api/verify-external-api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey })
+      })
+        .then(handleJsonResponse)
+        .then(data => {
+          if (data.status === 'success') {
+            isAiConfigured = true;
+            activeAiProvider = provider;
+            activeAiKey = apiKey;
+            if (apiFormStatus) {
+              apiFormStatus.className = 'apiform-status success';
+              apiFormStatus.textContent = data.message;
+            }
+            setTimeout(() => {
+              if (apiformOverlay) apiformOverlay.classList.add('hidden');
+              openAiFloatingPopup(`🤖 AI Assistant (${provider})`, `Connected to ${provider} API successfully!`);
+            }, 400);
+          } else {
+            if (apiFormStatus) {
+              apiFormStatus.className = 'apiform-status error';
+              apiFormStatus.textContent = data.message || 'API connection failed.';
+            }
+          }
+        })
+        .catch(err => {
+          if (apiFormStatus) {
+            apiFormStatus.className = 'apiform-status error';
+            apiFormStatus.textContent = 'Connection error: ' + err;
+          }
+        });
+    });
+  }
+
+  if (btnBrowseLocalModel && localModelPathInput) {
+    btnBrowseLocalModel.addEventListener('click', () => {
+      const pathPrompt = prompt('Enter or paste local model file path:');
+      if (pathPrompt) {
+        localModelPathInput.value = sanitizeInput(pathPrompt);
+      }
+    });
+  }
+
+  if (btnLoadLocalModel) {
+    btnLoadLocalModel.addEventListener('click', () => {
+      const modelPath = sanitizeInput(localModelPathInput ? localModelPathInput.value : '');
+
+      if (!modelPath) {
+        if (apiFormStatus) {
+          apiFormStatus.className = 'apiform-status error';
+          apiFormStatus.textContent = 'Please enter a local model file path.';
+        }
+        return;
+      }
+
+      fetch('/api/verify-local-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelPath })
+      })
+        .then(handleJsonResponse)
+        .then(data => {
+          if (data.status === 'success' || data.status === 'warning') {
+            isAiConfigured = true;
+            activeAiProvider = `Local (${data.modelName})`;
+            activeModelPath = data.modelPath;
+            if (apiFormStatus) {
+              apiFormStatus.className = 'apiform-status success';
+              apiFormStatus.textContent = data.message;
+            }
+            setTimeout(() => {
+              if (apiformOverlay) apiformOverlay.classList.add('hidden');
+              openAiFloatingPopup(`🤖 Local Model (${data.modelName})`, `Loaded local model: ${data.modelPath}`);
+            }, 400);
+          } else {
+            if (apiFormStatus) {
+              apiFormStatus.className = 'apiform-status error';
+              apiFormStatus.textContent = data.message || 'Model loading failed.';
+            }
+          }
+        })
+        .catch(err => {
+          if (apiFormStatus) {
+            apiFormStatus.className = 'apiform-status error';
+            apiFormStatus.textContent = 'Model verification error: ' + err;
+          }
+        });
+    });
+  }
+
+  if (btnEnlightenMe && folderPickerLocal) {
+    btnEnlightenMe.addEventListener('click', () => {
+      alert('Enlighten Me: Please select folder(s) to search for local AI model files (.gguf, .bin, .safetensors, .onnx, .pth, .pt).');
+      folderPickerLocal.click();
+    });
+
+    folderPickerLocal.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      const filePaths = files.map(f => f.webkitRelativePath || f.name);
+
+      fetch('/api/search-local-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: filePaths })
+      })
+        .then(handleJsonResponse)
+        .then(data => {
+          if (data.status === 'success' && data.models && data.models.length > 0) {
+            if (foundModelsSelect) {
+              foundModelsSelect.innerHTML = '';
+              data.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                foundModelsSelect.appendChild(opt);
+              });
+            }
+            if (enlightenResultsArea) enlightenResultsArea.classList.remove('hidden');
+            if (apiFormStatus) {
+              apiFormStatus.className = 'apiform-status success';
+              apiFormStatus.textContent = `Found ${data.models.length} model file(s)!`;
+            }
+          } else {
+            alert('No local AI model files (.gguf, .bin, .safetensors, .onnx, .pth, .pt) were found in the selected folders.');
+            if (apiFormStatus) {
+              apiFormStatus.className = 'apiform-status error';
+              apiFormStatus.textContent = 'No local model files found in selected folders.';
+            }
+          }
+        });
+    });
+  }
+
+  if (btnUseFoundModel && foundModelsSelect && localModelPathInput) {
+    btnUseFoundModel.addEventListener('click', () => {
+      const selectedModel = foundModelsSelect.value;
+      if (selectedModel) {
+        localModelPathInput.value = sanitizeInput(selectedModel);
+        if (btnLoadLocalModel) btnLoadLocalModel.click();
+      }
+    });
+  }
+
+  function openAiFloatingPopup(title, sysMsg) {
+    if (!aiFloatingPopup) return;
+
+    if (aiPopupTitle) aiPopupTitle.textContent = title;
+    if (aiPopupBody) {
+      aiPopupBody.innerHTML = `<div class="ai-popup-msg system">${sanitizeInput(sysMsg)}</div>`;
+    }
+    aiFloatingPopup.classList.remove('hidden');
+  }
+
+  if (aiPopupCloseBtn && aiFloatingPopup) {
+    aiPopupCloseBtn.addEventListener('click', () => {
+      aiFloatingPopup.classList.add('hidden');
+    });
+  }
+
+  if (aiPopupHeader && aiFloatingPopup) {
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    aiPopupHeader.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      offsetX = e.clientX - aiFloatingPopup.offsetLeft;
+      offsetY = e.clientY - aiFloatingPopup.offsetTop;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      aiFloatingPopup.style.left = `${e.clientX - offsetX}px`;
+      aiFloatingPopup.style.top = `${e.clientY - offsetY}px`;
+      aiFloatingPopup.style.bottom = 'auto';
+      aiFloatingPopup.style.right = 'auto';
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+  }
+
+  function sendAiPrompt() {
+    if (!aiPopupInput) return;
+    const rawPrompt = aiPopupInput.value;
+    const cleanPrompt = sanitizeInput(rawPrompt);
+
+    if (!cleanPrompt) return;
+
+    aiPopupInput.value = '';
+
+    if (aiPopupBody) {
+      const userMsg = document.createElement('div');
+      userMsg.className = 'ai-popup-msg user';
+      userMsg.textContent = cleanPrompt;
+      aiPopupBody.appendChild(userMsg);
+      aiPopupBody.scrollTop = aiPopupBody.scrollHeight;
+    }
+
+    const codeCtx = getPlainTextFromCanvas ? getPlainTextFromCanvas() : '';
+
+    fetch('/api/ai-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: cleanPrompt,
+        provider: activeAiProvider,
+        apiKey: activeAiKey,
+        modelPath: activeModelPath,
+        codeContext: codeCtx
+      })
+    })
+      .then(handleJsonResponse)
+      .then(data => {
+        if (aiPopupBody) {
+          const assistantMsg = document.createElement('div');
+          assistantMsg.className = 'ai-popup-msg assistant';
+          assistantMsg.textContent = data.reply || 'Request completed.';
+          aiPopupBody.appendChild(assistantMsg);
+          aiPopupBody.scrollTop = aiPopupBody.scrollHeight;
+        }
+      })
+      .catch(err => {
+        if (aiPopupBody) {
+          const errMsg = document.createElement('div');
+          errMsg.className = 'ai-popup-msg system';
+          errMsg.textContent = 'Error: ' + err;
+          aiPopupBody.appendChild(errMsg);
+          aiPopupBody.scrollTop = aiPopupBody.scrollHeight;
+        }
+      });
+  }
+
+  if (aiPopupSendBtn) {
+    aiPopupSendBtn.addEventListener('click', sendAiPrompt);
+  }
+
+  if (aiPopupInput) {
+    aiPopupInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendAiPrompt();
+      }
+    });
+  }
+
 });

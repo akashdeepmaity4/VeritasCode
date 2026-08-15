@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <link rel="stylesheet" href="../static/css/style.css">
+  <script src="../static/js/main.js"></script>
+
+</head>
+
+<body>
+  <div class="apiform">
+    <div class="apiform-card" id="apiformCard">
+      <div class="apiform-header">
+        <h3 class="apiform-title">AI Hub</h3>
+        <button class="apiform-close-btn" id="apiFormCloseBtn" title="Close">&times;</button>
+      </div>
+
+      <div class="apiform-nav">
+        <button class="aihubbutton active" id="btnExternalApi" type="button">External API</button>
+        <button class="aihubbutton" id="btnLocalModel" type="button">Local Model</button>
+      </div>
+
+      <div id="sectionExternalApi" class="apiform-section">
+        <div class="apiform-group">
+          <label for="apiProviderSelect" class="apiform-label">Select company</label>
+          <select id="apiProviderSelect" class="apiform-select">
+            <option value="Gemini">Gemini (Google)</option>
+            <option value="Grok">Grok (xAI)</option>
+            <option value="ChatGPT">ChatGPT (OpenAI)</option>
+            <option value="Claude">Claude (Anthropic)</option>
+            <option value="DeepSeek">DeepSeek</option>
+            <option value="Mistral">Mistral AI</option>
+            <option value="Llama">Llama (Meta)</option>
+            <option value="Cohere">Cohere</option>
+            <option value="Perplexity">Perplexity AI</option>
+            <option value="OpenRouter">OpenRouter</option>
+            <option value="Custom">Custom API</option>
+          </select>
+        </div>
+
+        <div class="apiform-group">
+          <label for="apiKeyInput" class="apiform-label">API Key</label>
+          <div class="apiform-input-row">
+            <input type="password" id="apiKeyInput" class="apiform-input" placeholder="Enter your API key..."
+              autocomplete="off">
+            <button type="button" class="aihubbutton-sm" id="toggleApiKeyVisBtn">Show</button>
+          </div>
+        </div>
+
+        <div class="apiform-btn-center">
+          <button class="aihubbutton" id="btnConnectApi" type="button">Connect API</button>
+        </div>
+      </div>
+
+      <div id="sectionLocalModel" class="apiform-section hidden">
+        <div class="apiform-group">
+          <label for="localModelPathInput" class="apiform-label">Local Model File Path:</label>
+          <div class="apiform-input-row">
+            <input type="text" id="localModelPathInput" class="apiform-input"
+              placeholder="enter file path of local ai model">
+            <button type="button" class="aihubbutton-sm" id="btnBrowseLocalModel">Browse</button>
+          </div>
+        </div>
+
+        <div class="apiform-btn-center">
+          <button class="aihubbutton" id="btnLoadLocalModel" type="button">Load Model</button>
+        </div>
+
+        <hr class="apiform-hr">
+
+        <div class="apiform-btn-center">
+          <button class="aihubbutton enlighten-btn" id="btnEnlightenMe" type="button">Enlighten Me</button>
+          <p class="apiform-desc">Select folder(s) to automatically search for local AI model files (.gguf, .bin,
+            .safetensors, .onnx, .pth, .pt)</p>
+
+          <div id="enlightenResultsArea" class="hidden enlighten-results">
+            <label for="foundModelsSelect" class="apiform-label">Found Models:</label>
+            <select id="foundModelsSelect" class="apiform-select"></select>
+            <div style="margin-top: 8px;">
+              <button class="aihubbutton-sm" id="btnUseFoundModel" type="button">Use Selected Model</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="apiFormStatus" class="apiform-status"></div>
+    </div>
+  </div>
+</body>
+
+</html>

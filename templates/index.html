@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Veritas Code</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 </head>
+
 <body>
 
   <input type="file" id="filePicker" style="display: none;">
   <input type="file" id="folderPicker" webkitdirectory directory style="display: none;">
+  <input type="file" id="folderPickerLocal" webkitdirectory directory multiple style="display: none;">
   <input type="file" id="native-file-picker" style="display: none;">
 
   <header class="app-header">
@@ -24,9 +28,9 @@
         <div class="dropdown-item" data-action="open-file">
           <span>Open...</span><span class="shortcut">Ctrl+O</span>
         </div>
-        
+
         <div class="dropdown-divider"></div>
-        
+
         <div class="dropdown-item" data-action="save">
           <span>Save</span><span class="shortcut">Ctrl+S</span>
         </div>
@@ -36,15 +40,15 @@
         <div class="dropdown-item" data-action="save-copy-as">
           <span>Save Copy As...</span><span class="shortcut">Alt+Shift+S</span>
         </div>
-        
+
         <div class="dropdown-divider"></div>
-        
+
         <div class="dropdown-item" data-action="print-window">
           <span>Print Window</span><span class="shortcut">Ctrl+P</span>
         </div>
-        
+
         <div class="dropdown-divider"></div>
-        
+
         <div class="dropdown-item" data-action="close-window">
           <span>Close Window</span><span class="shortcut">Alt+F4</span>
         </div>
@@ -64,9 +68,9 @@
         <div class="dropdown-item" data-action="redo">
           <span>Redo</span><span class="shortcut">Ctrl+Y</span>
         </div>
-        
+
         <div class="dropdown-divider"></div>
-        
+
         <div class="dropdown-item" data-action="cut">
           <span>Cut</span><span class="shortcut">Ctrl+X</span>
         </div>
@@ -76,32 +80,27 @@
         <div class="dropdown-item" data-action="paste">
           <span>Paste</span><span class="shortcut">Ctrl+V</span>
         </div>
-        
+
         <div class="dropdown-divider"></div>
-        
+
         <div class="dropdown-item" data-action="select-all">
           <span>Select All</span><span class="shortcut">Ctrl+A</span>
         </div>
       </div>
     </div>
 
-    <!-- View Menu Dropdown Wrapper -->
     <div class="menu-dropdown-container">
       <button class="menu-item" id="view-menu-btn">View</button>
       <div id="view-dropdown" class="app-dropdown-menu hidden">
         <div class="dropdown-item" data-action="toggle-theme">
           <span id="theme-status-text">Switch to Dark Mode</span>
         </div>
-        
+
         <div class="dropdown-divider"></div>
-        
-        <div class="dropdown-item" data-action="toggle-line-numbers">
-          <span id="lines-status-text">Hide Line Numbers</span>
-        </div>
+
       </div>
     </div>
 
-<!-- Settings Menu Dropdown Wrapper -->
     <div class="menu-dropdown-container">
       <button class="menu-item" id="settings-menu-btn">Settings</button>
       <div id="settings-dropdown" class="app-dropdown-menu hidden">
@@ -109,8 +108,7 @@
           <span>Font Settings</span>
           <span class="shortcut">▶</span>
         </div>
-        
-        <!-- Font Settings Sub-Panel -->
+
         <div id="font-settings-panel" class="settings-subpanel hidden">
           <div class="setting-row">
             <label for="fontSizeInput">Size (px):</label>
@@ -130,7 +128,7 @@
         </div>
       </div>
     </div>
-<!-- Help Menu Dropdown Wrapper -->
+
     <div class="menu-dropdown-container">
       <button class="menu-item" id="help-menu-btn">Help</button>
       <div id="help-dropdown" class="app-dropdown-menu hidden">
@@ -151,7 +149,7 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <svg class="logo-icon" id="logoBtn" viewBox="0 0 24 24">
-          <path d="M12 2L2 19h20L12 2zm0 4l6.5 11h-13L12 6z"/>
+          <path d="M12 2L2 19h20L12 2zm0 4l6.5 11h-13L12 6z" />
         </svg>
         <span class="sidebar-title" id="notesToggleBtn">Tree</span>
         <div class="sidebar-actions">
@@ -167,21 +165,24 @@
       <div class="editor-header">
         <span id="activeFileName" style="padding-left: 10px; font-weight: 500;">No file open</span>
         <div class="header-tools">
-          <button class="tool-icon">✦</button>
+          <button class="tool-icon" id="aiModalBtn" title="AI Model & API Hub">✦</button>
           <button class="tool-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 7v6h6"></path>
               <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
             </svg>
           </button>
           <button class="tool-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 7v6h-6"></path>
               <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
             </svg>
           </button>
           <button class="versioncontrol-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="6" y1="3" x2="6" y2="15"></line>
               <circle cx="18" cy="6" r="3"></circle>
               <circle cx="6" cy="18" r="3"></circle>
@@ -191,7 +192,8 @@
           <button class="tool-icon">&lt;/&gt;</button>
           <button class="tool-icon">▶</button>
           <button class="tool-icon" id="saveFileBtn" title="Save File (Ctrl+S)">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
               <polyline points="17 21 17 13 7 13 7 21"></polyline>
               <polyline points="7 3 7 8 15 8"></polyline>
@@ -201,11 +203,37 @@
       </div>
 
       <div class="editor-grid-container">
-        <div class="text-canvas" contenteditable="true" id="textCanvas"></div>
+        <div class="text-canvas monaco-editor-canvas" id="textCanvas"></div>
       </div>
     </main>
   </div>
 
+  <!-- Modal Overlay for AI Hub (apiform.html) -->
+  <div id="apiformOverlay" class="apiform-overlay hidden">
+    {% include 'apiform.html' %}
+  </div>
+
+  <!-- Persistent Floating AI Assistant Popup Textbox -->
+  <div id="aiFloatingPopup" class="ai-floating-popup hidden">
+    <div class="ai-popup-header" id="aiPopupHeader">
+      <span class="ai-popup-title" id="aiPopupTitle">🤖 AI Assistant</span>
+      <div class="ai-popup-controls">
+        <button class="ai-popup-icon-btn" id="aiPopupConfigBtn" title="Reconfigure AI Settings">⚙️</button>
+        <button class="ai-popup-close-btn" id="aiPopupCloseBtn" title="Close Popup">&times;</button>
+      </div>
+    </div>
+    <div class="ai-popup-body" id="aiPopupBody">
+      <div class="ai-popup-msg system">
+        AI connected! Ask questions or request code assistance anytime.
+      </div>
+    </div>
+    <div class="ai-popup-footer">
+      <input type="text" id="aiPopupInput" class="ai-popup-input" placeholder="Ask AI anything..." autocomplete="off">
+      <button id="aiPopupSendBtn" class="ai-popup-send-btn">Send</button>
+    </div>
+  </div>
+
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>

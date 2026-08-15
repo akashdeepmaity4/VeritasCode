@@ -5,10 +5,11 @@
   --bg-active: #37373d;
   --veritas-blue: #007acc;
   --veritas-blue-hover: #0098ff;
-  --text-main: #cccccc;
+  --text-main: var(--veritas-blue);
   --text-muted: #858585;
   --border-color: #2b2b2b;
 }
+
 
 .root-dark {
   --bg-primary: #1e1e1e;
@@ -216,6 +217,8 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
+
+
 .current-file-title {
   font-size: 18px;
   font-weight: 600;
@@ -373,7 +376,7 @@ body {
 
 .editor-grid-container {
   flex: 1;
-  padding: 20px;
+  padding: 0;
   display: flex;
   flex-direction: row;
   height: calc(100vh - 75px);
@@ -399,29 +402,389 @@ body {
   display: none !important;
 }
 
-.text-canvas {
+.text-canvas,
+.monaco-editor-canvas {
   flex: 1;
   width: 100%;
   height: 100%;
   background-color: transparent;
-  border: 1px dashed var(--border-color);
-  border-radius: 4px;
-  color: var(--text-main);
-  padding: 20px;
-  font-size: 15px;
-  line-height: 1.6;
+  border: none;
   outline: none;
-  overflow-y: auto;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
-.text-canvas:focus {
-  border-color: var(--veritas-blue);
-}
 
 .canvas-heading {
   color: var(--veritas-blue);
   font-size: 24px;
   margin-bottom: 15px;
   font-weight: bold;
+}
+
+/* AI Form & Hub Styles */
+.apiform-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(3px);
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.apiform-overlay.hidden {
+  display: none !important;
+}
+
+.apiform-card, .apiform {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  width: 460px;
+  max-width: 90vw;
+  background-color: var(--bg-sidebar, #1e1e1e);
+  color: var(--text-main, #e0e0e0);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.apiform-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color, #333);
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.apiform-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--veritas-blue, #007acc);
+}
+
+.apiform-close-btn {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.apiform-close-btn:hover {
+  color: #fff;
+}
+
+.apiform-nav {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.aihubbutton {
+  background-color: #2b2b2b;
+  border: 1px solid var(--veritas-blue, #007acc);
+  color: #ffffff;
+  padding: 8px 16px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aihubbutton:hover {
+  background-color: var(--veritas-blue, #007acc);
+  color: #ffffff;
+}
+
+.aihubbutton.active {
+  background-color: var(--veritas-blue, #007acc);
+  color: #ffffff;
+  font-weight: bold;
+  box-shadow: 0 0 8px rgba(0, 122, 204, 0.5);
+}
+
+.aihubbutton-sm {
+  background-color: var(--veritas-blue, #007acc);
+  border: none;
+  color: #ffffff;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.aihubbutton-sm:hover {
+  background-color: var(--veritas-blue-hover, #0098ff);
+}
+
+.apiform-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.apiform-section.hidden {
+  display: none !important;
+}
+
+.apiform-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.apiform-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main, #d4d4d4);
+}
+
+.apiform-input, .apiform-select {
+  width: 100%;
+  background-color: var(--bg-dark, #121212);
+  color: #ffffff;
+  border: 1px solid var(--border-color, #444);
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+}
+
+.apiform-input:focus, .apiform-select:focus {
+  border-color: var(--veritas-blue, #007acc);
+}
+
+.apiform-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.apiform-btn-center {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.apiform-hr {
+  margin: 15px 0;
+  border: 0;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+.apiform-desc {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.enlighten-btn {
+  background-color: #3b2063;
+  border-color: #8a2be2;
+}
+
+.enlighten-btn:hover {
+  background-color: #8a2be2;
+}
+
+.enlighten-results {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: var(--bg-dark, #121212);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+}
+
+.enlighten-results.hidden {
+  display: none !important;
+}
+
+.apiform-status {
+  margin-top: 12px;
+  font-size: 12px;
+  text-align: center;
+  min-height: 18px;
+}
+
+.apiform-status.success {
+  color: #4caf50;
+}
+
+.apiform-status.error {
+  color: #f44336;
+}
+
+/* Floating Persistent AI Assistant Popup Textbox */
+.ai-floating-popup {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 360px;
+  max-width: 90vw;
+  height: 420px;
+  background-color: var(--bg-sidebar, #1e1e1e);
+  border: 1px solid var(--veritas-blue, #007acc);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 15000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.ai-floating-popup.hidden {
+  display: none !important;
+}
+
+.ai-popup-header {
+  background-color: var(--bg-dark, #121212);
+  border-bottom: 1px solid var(--border-color, #333);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: move;
+  user-select: none;
+}
+
+.ai-popup-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--veritas-blue, #007acc);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-popup-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-popup-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+.ai-popup-icon-btn:hover {
+  opacity: 1.0;
+  transform: scale(1.1);
+}
+
+.ai-popup-close-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ai-popup-close-btn:hover {
+  color: #ff5555;
+}
+
+.ai-popup-body {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--bg-dark, #181818);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ai-popup-msg {
+  padding: 8px 12px;
+  border-radius: 6px;
+  max-width: 88%;
+  word-wrap: break-word;
+}
+
+.ai-popup-msg.system {
+  background-color: rgba(0, 122, 204, 0.15);
+  border: 1px solid rgba(0, 122, 204, 0.3);
+  color: var(--veritas-blue-hover, #0098ff);
+  align-self: center;
+  text-align: center;
+  font-size: 12px;
+  width: 100%;
+}
+
+.ai-popup-msg.user {
+  background-color: var(--veritas-blue, #007acc);
+  color: #ffffff;
+  align-self: flex-end;
+}
+
+.ai-popup-msg.assistant {
+  background-color: #2a2a2a;
+  color: #d4d4d4;
+  border: 1px solid #3a3a3a;
+  align-self: flex-start;
+  white-space: pre-wrap;
+}
+
+.ai-popup-footer {
+  padding: 8px;
+  background-color: var(--bg-sidebar, #1e1e1e);
+  border-top: 1px solid var(--border-color, #333);
+  display: flex;
+  gap: 6px;
+}
+
+.ai-popup-input {
+  flex: 1;
+  background-color: var(--bg-dark, #121212);
+  color: #ffffff;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+}
+
+.ai-popup-input:focus {
+  border-color: var(--veritas-blue, #007acc);
+}
+
+.ai-popup-send-btn {
+  background-color: var(--veritas-blue, #007acc);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-popup-send-btn:hover {
+  background-color: var(--veritas-blue-hover, #0098ff);
 }
