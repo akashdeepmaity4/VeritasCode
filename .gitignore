@@ -8,3 +8,5 @@ context.md
 !.vscode/settings.json
 *.log
 'Sample Note.md'
+*.dll
+python314.dll
