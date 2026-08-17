@@ -50,17 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Base GitHub Repository URL
   const GITHUB_REPO_URL = 'https://github.com/akashdeepmaity4/VeritasCode/blob/main';
 
-  // Line Numbers Sidebar Container Setup
   const gridContainer = document.querySelector('.editor-grid-container');
-  let lineNumbersContainer = document.querySelector('.line-numbers');
-
-  if (gridContainer && !lineNumbersContainer) {
-    lineNumbersContainer = document.createElement('div');
-    lineNumbersContainer.className = 'line-numbers hidden';
-    lineNumbersContainer.contentEditable = 'false';
-    lineNumbersContainer.setAttribute('aria-hidden', 'true');
-    gridContainer.insertBefore(lineNumbersContainer, textCanvas);
-  }
 
   // Set Default View Menu Labels
   if (themeStatusText) themeStatusText.textContent = 'Enable Light Mode';
@@ -157,6 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
           language: pendingFileName ? getMonacoLanguage(pendingFileName) : 'python',
           theme: isLight ? 'vs' : 'vs-dark',
           automaticLayout: true,
+          wordWrap: 'on',
+          wrappingStrategy: 'advanced',
+          wrappingIndent: 'same',
           fontSize: 14,
           minimap: { enabled: true },
           scrollBeyondLastLine: false,
@@ -169,34 +162,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         isMonacoReady = true;
 
+        if (container) {
+          container.removeAttribute('contenteditable');
+        }
+
         if (pendingContent !== null) {
           setEditorContent(pendingContent, pendingFileName);
           pendingContent = null;
           pendingFileName = null;
+        } else {
+          monacoEditor.setScrollTop(0);
+          monacoEditor.revealLine(1);
+          monacoEditor.setPosition({ lineNumber: 1, column: 1 });
         }
 
         monacoEditor.onDidChangeModelContent(() => {
           triggerAutoSave();
         });
 
-        // Add keyboard command shortcuts directly to Monaco
-        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-          saveCurrentFile();
-        });
+        monacoEditor.focus();
 
-        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, () => {
-          triggerSaveAsFile();
-        });
-
-        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyN, () => {
-          if (actionNewFile) actionNewFile.click();
-          else createNewFilePrompt();
-        });
-
-        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO, () => {
-          if (nativeFilePicker) nativeFilePicker.click();
-          else if (filePicker) filePicker.click();
-        });
+        if (window.ResizeObserver) {
+          const ro = new ResizeObserver(() => {
+            if (monacoEditor) {
+              monacoEditor.layout();
+            }
+          });
+          ro.observe(container);
+        }
       });
     }
   }
@@ -204,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMonacoEditor();
 
   // --- Utility Functions ---
-  
+
   async function handleJsonResponse(res) {
     const contentType = res ? res.headers.get('content-type') || '' : '';
     if (contentType.includes('application/json')) {
@@ -240,10 +233,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (model) {
         monaco.editor.setModelLanguage(model, lang);
       }
+      monacoEditor.setScrollTop(0);
+      monacoEditor.revealLine(1);
+      monacoEditor.setPosition({ lineNumber: 1, column: 1 });
+      monacoEditor.focus();
     } else {
       pendingContent = text;
       pendingFileName = fileNameOrPath || 'py';
       if (textCanvas && !monacoEditor) {
+        textCanvas.contentEditable = 'true';
         textCanvas.textContent = text;
       }
     }
@@ -264,10 +262,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Sidebar Mechanics ---
   if (notesToggleBtn) {
-    notesToggleBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+    notesToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sidebar.classList.add('collapsed');
+      setTimeout(() => {
+        if (monacoEditor && isMonacoReady) {
+          monacoEditor.layout();
+        }
+      }, 220);
+    });
   }
+
   if (logoBtn) {
-    logoBtn.addEventListener('click', () => sidebar.classList.remove('collapsed'));
+    logoBtn.style.cursor = 'pointer';
+    logoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sidebar.classList.remove('collapsed');
+      setTimeout(() => {
+        if (monacoEditor && isMonacoReady) {
+          monacoEditor.layout();
+        }
+      }, 220);
+    });
   }
 
   // --- Save Button Binding ---
@@ -407,16 +423,27 @@ document.addEventListener('DOMContentLoaded', () => {
           else document.execCommand('redo');
           break;
         case 'cut':
-          document.execCommand('cut');
+          if (monacoEditor && isMonacoReady) {
+            monacoEditor.focus();
+            document.execCommand('cut');
+          } else {
+            document.execCommand('cut');
+          }
           break;
         case 'copy':
-          document.execCommand('copy');
+          if (monacoEditor && isMonacoReady) {
+            monacoEditor.focus();
+            document.execCommand('copy');
+          } else {
+            document.execCommand('copy');
+          }
           break;
         case 'paste':
           try {
             if (navigator.clipboard && navigator.clipboard.readText) {
               const text = await navigator.clipboard.readText();
               if (monacoEditor && isMonacoReady) {
+                monacoEditor.focus();
                 const selection = monacoEditor.getSelection();
                 monacoEditor.executeEdits('paste', [{
                   range: selection,
@@ -435,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
           break;
         case 'select-all':
           if (monacoEditor && isMonacoReady) {
+            monacoEditor.focus();
             const model = monacoEditor.getModel();
             if (model) monacoEditor.setSelection(model.getFullModelRange());
           } else {
@@ -556,6 +584,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 600);
   }
 
+  function getCurrentFileDirAndName() {
+    let dir = currentRootDir || '.';
+    let name = activeFileName && activeFileName.textContent !== 'No file open'
+      ? activeFileName.textContent
+      : `untitled.${currentFileExt}`;
+
+    if (currentFilePath) {
+      const normalized = normalizePath(currentFilePath);
+      const lastSlash = normalized.lastIndexOf('/');
+      if (lastSlash !== -1) {
+        dir = normalized.substring(0, lastSlash);
+        name = normalized.substring(lastSlash + 1);
+      } else {
+        name = normalized;
+      }
+    }
+
+    return { dir, name };
+  }
+
   // --- Save / Save As / Save Copy Helpers ---
   async function saveCurrentFile(isAutoSave = false) {
     const plainContent = getPlainTextFromCanvas();
@@ -573,19 +621,28 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 2. Direct Save via Backend / File Path (pywebview or local server context)
-    if (currentFilePath) {
+    let targetPath = currentFilePath;
+    if (!targetPath && activeFileName && activeFileName.textContent && activeFileName.textContent !== 'No file open') {
+      const fileName = activeFileName.textContent;
+      const targetDir = currentRootDir || '.';
+      targetPath = normalizePath(`${targetDir}/${fileName}`);
+      currentFilePath = targetPath;
+    }
+
+    // 2. Direct Save via Backend / File Path (Overwrites directly in place without prompting)
+    if (targetPath) {
       fetch('/save-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          path: currentFilePath,
+          path: targetPath,
           content: plainContent
         })
       })
         .then(handleJsonResponse)
         .then(data => {
           if (data.status === 'success') {
+            currentFilePath = targetPath;
             if (!isAutoSave) showSaveIndicator();
           } else {
             if (!isAutoSave) alert(`Save Failed: ${data.message}`);
@@ -598,19 +655,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 3. Fallback: If no current file path or file handle and NOT auto-save, trigger Save As
+    // 3. Fallback: If no current file path and no active file, prompt Save As
     if (!isAutoSave) {
       triggerSaveAsFile();
     }
   }
 
   async function triggerSaveAsFile() {
-    let targetPath = null;
     const plainContent = getPlainTextFromCanvas();
+    const { dir, name: currentName } = getCurrentFileDirAndName();
 
-    // Option A: pywebview Native Dialog
+    // Option A: pywebview Native Dialog (stay in same directory)
     if (window.pywebview && window.pywebview.api && window.pywebview.api.save_file_dialog) {
-      targetPath = await window.pywebview.api.save_file_dialog();
+      let targetPath = await window.pywebview.api.save_file_dialog(dir, currentName);
       if (!targetPath) return;
       targetPath = normalizePath(targetPath);
 
@@ -641,11 +698,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Option B: Standard Browser Mode (File System Access API)
     if ('showSaveFilePicker' in window) {
       try {
-        const defaultName = activeFileName && activeFileName.textContent !== 'No file open'
-          ? activeFileName.textContent
-          : `untitled.${currentFileExt}`;
         const handle = await window.showSaveFilePicker({
-          suggestedName: defaultName
+          suggestedName: currentName
         });
         const writable = await handle.createWritable();
         await writable.write(plainContent);
@@ -661,15 +715,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Option C: Fallback Prompt to save to backend / workspace
-    const defaultName = activeFileName && activeFileName.textContent !== 'No file open'
-      ? activeFileName.textContent
-      : `untitled.${currentFileExt}`;
-    const fileNamePrompt = prompt('Save file as:', defaultName);
-    if (!fileNamePrompt) return;
+    // Option C: Fallback Prompt to save in the SAME directory
+    const newFileName = prompt('Save file as (will stay in same directory):', currentName);
+    if (!newFileName) return;
 
-    const targetDir = currentRootDir || '.';
-    const targetPathStr = normalizePath(`${targetDir}/${fileNamePrompt}`);
+    const targetPathStr = normalizePath(`${dir}/${newFileName}`);
 
     fetch('/save-file', {
       method: 'POST',
@@ -684,13 +734,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.status === 'success') {
           currentFilePath = targetPathStr;
           fileHandle = null;
-          if (activeFileName) activeFileName.textContent = fileNamePrompt;
+          if (activeFileName) activeFileName.textContent = newFileName;
           showSaveIndicator();
         } else {
-          // Download fallback
           const blob = new Blob([plainContent], { type: 'text/plain;charset=utf-8' });
           const downloadLink = document.createElement('a');
-          downloadLink.download = fileNamePrompt;
+          downloadLink.download = newFileName;
           downloadLink.href = URL.createObjectURL(blob);
           downloadLink.click();
           URL.revokeObjectURL(downloadLink.href);
@@ -763,56 +812,125 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     textCanvas.addEventListener('keydown', (e) => {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return;
+      if (!isMonacoReady || !monacoEditor) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const sel = window.getSelection();
+          if (!sel || !sel.rangeCount) return;
 
-        const twoSpaceExts = ['html', 'htm', 'css', 'json', 'yaml', 'yml', 'js', 'ts'];
-        const spaceCount = twoSpaceExts.includes(currentFileExt) ? 2 : 4;
-        const indentSpaces = '\u00a0'.repeat(spaceCount);
+          const twoSpaceExts = ['html', 'htm', 'css', 'json', 'yaml', 'yml', 'js', 'ts'];
+          const spaceCount = twoSpaceExts.includes(currentFileExt) ? 2 : 4;
+          const indentSpaces = '\u00a0'.repeat(spaceCount);
 
-        const range = sel.getRangeAt(0);
-        const tabNode = document.createTextNode(indentSpaces);
-        range.insertNode(tabNode);
+          const range = sel.getRangeAt(0);
+          const tabNode = document.createTextNode(indentSpaces);
+          range.insertNode(tabNode);
 
-        range.setStartAfter(tabNode);
-        range.setEndAfter(tabNode);
-        sel.removeAllRanges();
-        sel.addRange(range);
-        updateLineNumbers();
+          range.setStartAfter(tabNode);
+          range.setEndAfter(tabNode);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          updateLineNumbers();
+        }
       }
     });
 
     textCanvas.addEventListener('paste', (e) => {
-      e.preventDefault();
-      const clipboardData = e.clipboardData || window.clipboardData;
-      if (!clipboardData) return;
+      if (!isMonacoReady || !monacoEditor) {
+        e.preventDefault();
+        const clipboardData = e.clipboardData || window.clipboardData;
+        if (!clipboardData) return;
 
-      const text = clipboardData.getData('text/plain');
-      const formatted = sanitizeHTML(text);
+        const text = clipboardData.getData('text/plain');
+        const formatted = sanitizeHTML(text);
 
-      document.execCommand('insertHTML', false, formatted);
-      updateLineNumbers();
+        document.execCommand('insertHTML', false, formatted);
+        updateLineNumbers();
+      }
     });
+  }
+
+  if (gridContainer) {
+    gridContainer.addEventListener('click', (e) => {
+      const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON';
+      if (!isInput && monacoEditor && isMonacoReady) {
+        monacoEditor.focus();
+      }
+    });
+  }
+
+  function isTextInput(el) {
+    if (!el) return false;
+    const tag = el.tagName ? el.tagName.toUpperCase() : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable) {
+      if (el.classList && el.classList.contains('inputarea')) {
+        return false;
+      }
+      return true;
+    }
+    return false;
   }
 
   // --- Keyboard Shortcuts Listener ---
   document.addEventListener('keydown', (e) => {
     const isCtrl = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
+    const activeEl = document.activeElement;
+
+    if (isTextInput(activeEl)) {
+      return;
+    }
+
+    // Explicit Arrow and Navigation Keys Handler for Monaco Editor
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'home', 'end', 'pageup', 'pagedown'].includes(key)) {
+      if (monacoEditor && isMonacoReady) {
+        e.preventDefault();
+        monacoEditor.focus();
+
+        let action = '';
+        if (key === 'arrowup') {
+          action = e.shiftKey ? 'cursorUpSelect' : 'cursorUp';
+        } else if (key === 'arrowdown') {
+          action = e.shiftKey ? 'cursorDownSelect' : 'cursorDown';
+        } else if (key === 'arrowleft') {
+          if (isCtrl && e.shiftKey) action = 'cursorWordLeftSelect';
+          else if (isCtrl) action = 'cursorWordLeft';
+          else if (e.shiftKey) action = 'cursorLeftSelect';
+          else action = 'cursorLeft';
+        } else if (key === 'arrowright') {
+          if (isCtrl && e.shiftKey) action = 'cursorWordRightSelect';
+          else if (isCtrl) action = 'cursorWordRight';
+          else if (e.shiftKey) action = 'cursorRightSelect';
+          else action = 'cursorRight';
+        } else if (key === 'home') {
+          action = e.shiftKey ? 'cursorHomeSelect' : 'cursorHome';
+        } else if (key === 'end') {
+          action = e.shiftKey ? 'cursorEndSelect' : 'cursorEnd';
+        } else if (key === 'pageup') {
+          action = e.shiftKey ? 'cursorPageUpSelect' : 'cursorPageUp';
+        } else if (key === 'pagedown') {
+          action = e.shiftKey ? 'cursorPageDownSelect' : 'cursorPageDown';
+        }
+
+        if (action) {
+          monacoEditor.trigger('keyboard', action, null);
+        }
+        return;
+      }
+    }
+
+    const isInsideMonaco = monacoEditor && isMonacoReady && textCanvas && textCanvas.contains(activeEl);
+
+    if (!isInsideMonaco && monacoEditor && isMonacoReady && !e.altKey) {
+      if (!isCtrl || ['s', 'o', 'n', 'p', 'q', 'k', '`'].includes(key)) {
+        monacoEditor.focus();
+      }
+    }
 
     // Alt + Shift + S: Save Copy As
     if (e.altKey && e.shiftKey && key === 's') {
       e.preventDefault();
       triggerSaveCopyAsFile();
-      return;
-    }
-
-    // Ctrl + P: Print Window
-    if (isCtrl && key === 'p') {
-      e.preventDefault();
-      window.print();
       return;
     }
 
@@ -830,6 +948,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Ctrl + Shift + N: Reset Editor Canvas
+    if (isCtrl && e.shiftKey && key === 'n') {
+      e.preventDefault();
+      resetEditorState();
+      return;
+    }
+
     // Ctrl + N: New File
     if (isCtrl && !e.shiftKey && key === 'n') {
       e.preventDefault();
@@ -838,10 +963,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Ctrl + Shift + N: Reset Editor Canvas
-    if (isCtrl && e.shiftKey && key === 'n') {
+    // Ctrl + P: Print Window
+    if (isCtrl && key === 'p') {
       e.preventDefault();
-      resetEditorState();
+      window.print();
       return;
     }
 
@@ -857,24 +982,53 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Editor Text Controls
-    if (document.activeElement === textCanvas || (textCanvas && textCanvas.contains(document.activeElement))) {
+    // Ctrl + K Chaining
+    if (isCtrl && key === 'k') {
+      e.preventDefault();
+      ctrlKPressed = true;
+      clearTimeout(ctrlKTimeout);
+      ctrlKTimeout = setTimeout(() => { ctrlKPressed = false; }, 2000);
+      return;
+    }
+
+    // Ctrl + K -> O: Open Directory
+    if (ctrlKPressed && key === 'o') {
+      e.preventDefault();
+      ctrlKPressed = false;
+      clearTimeout(ctrlKTimeout);
+      if (folderPicker) folderPicker.click();
+      else if (folderPickerLocal) folderPickerLocal.click();
+      return;
+    }
+
+    // Ctrl + O: Open File
+    if (isCtrl && !ctrlKPressed && key === 'o') {
+      e.preventDefault();
+      if (nativeFilePicker) nativeFilePicker.click();
+      else if (filePicker) filePicker.click();
+      return;
+    }
+
+    // If Monaco is active and focused, let Monaco handle text editing keys natively!
+    if (isInsideMonaco) {
+      return;
+    }
+
+    // Fallback Text Canvas Controls (Only when Monaco is NOT ready)
+    if (!isMonacoReady && (activeEl === textCanvas || (textCanvas && textCanvas.contains(activeEl)))) {
       if (isCtrl && !e.shiftKey && key === 'z') {
         e.preventDefault();
         document.execCommand('undo');
-        updateLineNumbers();
         return;
       }
       if (isCtrl && key === 'y') {
         e.preventDefault();
         document.execCommand('redo');
-        updateLineNumbers();
         return;
       }
       if (isCtrl && key === 'x') {
         e.preventDefault();
         document.execCommand('cut');
-        updateLineNumbers();
         return;
       }
       if (isCtrl && key === 'c') {
@@ -886,29 +1040,6 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         document.execCommand('selectAll');
         return;
-      }
-    }
-
-    // Ctrl + K Chaining
-    if (isCtrl && key === 'k') {
-      e.preventDefault();
-      ctrlKPressed = true;
-      clearTimeout(ctrlKTimeout);
-      ctrlKTimeout = setTimeout(() => { ctrlKPressed = false; }, 1200);
-      return;
-    }
-
-    // Open Pickers
-    if (key === 'o') {
-      if (ctrlKPressed) {
-        e.preventDefault();
-        ctrlKPressed = false;
-        clearTimeout(ctrlKTimeout);
-        if (folderPicker) folderPicker.click();
-      } else if (isCtrl) {
-        e.preventDefault();
-        if (nativeFilePicker) nativeFilePicker.click();
-        else if (filePicker) filePicker.click();
       }
     }
   });

@@ -132,13 +132,54 @@ def run_file():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+def find_git_bash():
+    gb_in_path = shutil.which('git-bash') or shutil.which('git-bash.exe')
+    if gb_in_path:
+        return gb_in_path
+
+    candidate_paths = [
+        r'C:\Program Files\Git\git-bash.exe',
+        r'C:\Program Files\Git\bin\bash.exe',
+        r'C:\Program Files (x86)\Git\git-bash.exe',
+        r'C:\Program Files (x86)\Git\bin\bash.exe',
+        os.path.expanduser(r'~\AppData\Local\Programs\Git\git-bash.exe'),
+        os.path.expanduser(r'~\AppData\Local\Programs\Git\bin\bash.exe'),
+    ]
+
+    for path in candidate_paths:
+        if os.path.exists(path):
+            return path
+
+    if os.name == 'nt':
+        try:
+            import winreg
+            for hkey in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                try:
+                    with winreg.OpenKey(hkey, r"SOFTWARE\GitForWindows") as key:
+                        install_path, _ = winreg.QueryValueEx(key, "InstallPath")
+                        gb = os.path.join(install_path, "git-bash.exe")
+                        if os.path.exists(gb):
+                            return gb
+                        b = os.path.join(install_path, "bin", "bash.exe")
+                        if os.path.exists(b):
+                            return b
+                except OSError:
+                    pass
+        except ImportError:
+            pass
+
+    return None
+
 @app.route('/open-terminal', methods=['POST'])
 def open_terminal():
     try:
-        if shutil.which('bash'):
-            subprocess.Popen(['bash'])
-        elif os.name == 'nt' and os.path.exists(r'C:\Program Files\Git\bin\bash.exe'):
-            subprocess.Popen([r'C:\Program Files\Git\bin\bash.exe'])
+        native_bash = shutil.which('bash')
+        git_bash = find_git_bash()
+
+        if native_bash:
+            subprocess.Popen([native_bash])
+        elif git_bash:
+            subprocess.Popen([git_bash])
         else:
             if os.name == 'nt':
                 subprocess.Popen(['cmd.exe', '/c', 'start', 'cmd'])
