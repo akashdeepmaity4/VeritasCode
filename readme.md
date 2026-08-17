@@ -5,13 +5,13 @@
 
 An ultra lightweight, zero-lag, and locally run code editor for all 3 major operating systems, boasting minimal RAM footprint. It is fast, snappy and reliable. This can be used as a lite alternative to VS Code, Atom, Sublime Text if you don't need extensions. (Extension Marketplace will be added soon in v3.0)
 
-## ATTENTION!
-
-This is a brief introduction to this project. To see examples, details, project explainations and implementation, refer to [Here](workflowandcontext.md)
+> This is a brief introduction to this project. To see examples, details, project explainations and implementation, refer to [Here](workflowandcontext.md)
 
 ## Trademark and Copyright infringement prevention
 
 This is not in any way a tutorial, or a copy of any other 'editor', 'brand' or 'product'. Any similarities are purely coincidental. The author will NOT be held responsible for any forks or copies of this software which may immitate any of the above mentioned items.
+
+![logoslide](assets/logofull.png)
 
 ## FEATURES
 
@@ -79,4 +79,3 @@ pip install -r requirements.txt
 cd path/to/root/directory
 python launcher.py
 ```
-
