@@ -500,4 +500,4 @@ def internal_error(error):
     return jsonify({'status': 'error', 'message': f'Internal server error (500): {str(error)}'}), 500
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    app.run(port=5000, debug=False)
