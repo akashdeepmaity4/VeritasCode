@@ -1,0 +1,12 @@
+.env
+*.exe
+*.pyc
+context.md
+/__pycache__/
+*.spec
+.vscode/*
+!.vscode/settings.json
+*.log
+'Sample Note.md'
+*.dll
+python314.dll
