@@ -6,12 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Veritas Code</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <!--
-    Monaco AMD loader with CDN fallback. We try jsdelivr first; if that script
-    fails to load (network/CORS), the onerror handler appends the next CDN until
-    one exposes a working global `require`. main.js reads the winning CDN from
-    window.__monacoVsPath (defaulting to the first candidate).
-  -->
   <script>
     (function () {
       var V = '0.45.0';
