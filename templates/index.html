@@ -6,7 +6,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Veritas Code</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+  <!--
+    Monaco AMD loader with CDN fallback. We try jsdelivr first; if that script
+    fails to load (network/CORS), the onerror handler appends the next CDN until
+    one exposes a working global `require`. main.js reads the winning CDN from
+    window.__monacoVsPath (defaulting to the first candidate).
+  -->
+  <script>
+    (function () {
+      var V = '0.45.0';
+      var CDNS = [
+        'https://cdn.jsdelivr.net/npm/monaco-editor@' + V + '/min/vs',
+        'https://unpkg.com/monaco-editor@' + V + '/min/vs',
+        'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/' + V + '/min/vs'
+      ];
+      window.__monacoVsPath = CDNS[0];
+      var i = 0;
+      function tryLoad() {
+        if (typeof window.require !== 'undefined' && window.require.config) return;
+        if (i >= CDNS.length) { console.error('VeritasCode: all Monaco CDNs failed'); return; }
+        window.__monacoVsPath = CDNS[i];
+        var s = document.createElement('script');
+        s.src = CDNS[i] + '/loader.js';
+        s.async = false;
+        s.onload = function () { if (typeof window.require === 'undefined') { i++; tryLoad(); } };
+        s.onerror = function () { i++; tryLoad(); };
+        document.head.appendChild(s);
+      }
+      tryLoad();
+    })();
+  </script>
 </head>
 
 <body class="theme-dark">

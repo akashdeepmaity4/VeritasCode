@@ -129,14 +129,44 @@ document.addEventListener('DOMContentLoaded', () => {
   // --------------------------------------------------------------------- //
   // Monaco editor
   // --------------------------------------------------------------------- //
+  // CDN candidates for Monaco's AMD loader, tried in order. The first one whose
+  // loader.min.js actually loaded (exposing a working `require`) wins.
+  const MONACO_VERSION = '0.45.0';
+  const MONACO_CDNS = [
+    'https://cdn.jsdelivr.net/npm/monaco-editor@' + MONACO_VERSION + '/min/vs',
+    'https://unpkg.com/monaco-editor@' + MONACO_VERSION + '/min/vs',
+    'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/' + MONACO_VERSION + '/min/vs'
+  ];
+
+  // The active CDN base that successfully provided the loader. index.html's
+  // loader-fallback script sets window.__monacoVsPath to whichever CDN won;
+  // fall back to the first candidate if it didn't run.
+  let monacoVsPath = (window.__monacoVsPath) || MONACO_CDNS[0];
+
+  // Monaco spawns language/web workers. When loaded from a CDN via the AMD
+  // loader, cross-origin worker scripts are blocked by the browser, which is
+  // the real cause of "Monaco editor failed to load. Check your connection."
+  // We proxy every worker through a same-origin blob URL that importScripts
+  // the real worker from the CDN. This must be set BEFORE require.config().
+  window.MonacoEnvironment = {
+    getWorkerUrl: function () {
+      const workerProbe = monacoVsPath + '/base/worker/workerMain.js';
+      const shim =
+        "self.MonacoEnvironment={baseUrl:'" + monacoVsPath + "'};" +
+        "importScripts('" + workerProbe + "');";
+      const blob = new Blob([shim], { type: 'application/javascript' });
+      return URL.createObjectURL(blob);
+    }
+  };
+
   function initMonaco() {
     if (typeof require === 'undefined' || !require.config) {
       console.error('VeritasCode: Monaco loader (require) not found. CDN blocked?');
       showStatus('Monaco editor failed to load (CDN blocked?).', 'error');
       return;
     }
-    require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
-    require(['vs/editor.main'], function () {
+    require.config({ paths: { vs: monacoVsPath } });
+    require(['vs/editor/editor.main'], function () {
       if (!monacoContainer) return;
       const isLight = document.body.classList.contains('theme-light');
 
