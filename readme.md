@@ -6,13 +6,13 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 
->✅ *Implemented a native Chat Window to use AI locally or via an API (Under testing)
+✅ *Implemented a native Chat Window to use AI locally or via an API (Under testing)
 
 
->✅ Implemented Monaco Editor as the IDE's formatter and code canvas, getting rid of the manual breakage-prone overhead 
+✅ Implemented Monaco Editor as the IDE's formatter and code canvas, getting rid of the manual breakage-prone overhead 
 
 
->✅ Code-shortened, removed key Bind bugs, and removed old artifacts to make the Application even smaller in size.
+✅ Code-shortened, removed key Bind bugs, and removed old artifacts to make the Application even smaller in size.
 
 ## Trademark and Copyright infringement prevention
 
