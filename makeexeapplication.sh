@@ -13,3 +13,7 @@ mv launcher.exe VeritasCode.exe
 rm -rf dist build *.spec
 
 echo Done!
+
+echo starting the application ...
+
+VeritasCode.exe

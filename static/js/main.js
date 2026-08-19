@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Monaco editor
   // --------------------------------------------------------------------- //
   // CDN candidates for Monaco's AMD loader, tried in order. The first one whose
-  // loader.min.js actually loaded (exposing a working `require`) wins.
+  // loader.js actually loaded (exposing a working `require`) wins.
   const MONACO_VERSION = '0.45.0';
   const MONACO_CDNS = [
     'https://cdn.jsdelivr.net/npm/monaco-editor@' + MONACO_VERSION + '/min/vs',
@@ -159,12 +159,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // The loader.js script is injected asynchronously by index.html's CDN-
+  // fallback IIFE, so `require` is NOT guaranteed to exist yet when
+  // DOMContentLoaded fires. initMonaco() must wait for the loader to finish
+  // downloading before calling require.config(). We poll for it; if it never
+  // appears (all CDNs down), we surface the original error after a timeout.
   function initMonaco() {
-    if (typeof require === 'undefined' || !require.config) {
-      console.error('VeritasCode: Monaco loader (require) not found. CDN blocked?');
-      showStatus('Monaco editor failed to load (CDN blocked?).', 'error');
-      return;
-    }
+    const loaderReady = () => typeof require !== 'undefined' && !!require.config;
+    if (loaderReady()) { startMonaco(); return; }
+
+    const deadline = Date.now() + 15000; // 15s for the loader to load from a CDN
+    const poll = setInterval(() => {
+      if (loaderReady()) {
+        clearInterval(poll);
+        startMonaco();
+      } else if (Date.now() > deadline) {
+        clearInterval(poll);
+        console.error('VeritasCode: Monaco loader (require) not found. CDN blocked?');
+        showStatus('Monaco editor failed to load (CDN blocked?).', 'error');
+      }
+    }, 50);
+  }
+
+  function startMonaco() {
     require.config({ paths: { vs: monacoVsPath } });
     require(['vs/editor/editor.main'], function () {
       if (!monacoContainer) return;
