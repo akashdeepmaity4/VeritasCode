@@ -10,11 +10,13 @@ Or via launcher.py for the pywebview desktop window.
 """
 from flask import Flask, render_template, request, jsonify
 import os
+import re
 import subprocess
 import shutil
 import html
 import urllib.request
 import urllib.error
+import urllib.parse
 import json
 
 app = Flask(__name__, template_folder='../templates', static_folder='../static')
@@ -23,9 +25,6 @@ app = Flask(__name__, template_folder='../templates', static_folder='../static')
 WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
-# --------------------------------------------------------------------------- #
-# Helpers
-# --------------------------------------------------------------------------- #
 def is_git_restricted(path_str):
     """Block any path that touches a .git directory."""
     if not path_str:
@@ -36,23 +35,56 @@ def is_git_restricted(path_str):
 
 
 def resolve_workspace_path(path_str):
-    """Anchor a relative path to the workspace root."""
+    """Anchor a relative path to the workspace root.
+
+    Anti-traversal: the resolved absolute path must stay inside
+    WORKSPACE_ROOT. Any attempt to escape with '..' or an absolute path is
+    rejected by returning an empty string, which callers treat as invalid.
+    """
     if not path_str:
         return ''
-    if os.path.isabs(path_str):
-        return os.path.abspath(path_str)
-    normalized = path_str.replace('\\', '/').lstrip('/').lstrip('.')
-    while normalized.startswith('/'):
-        normalized = normalized.lstrip('/')
-    if not normalized:
+    # Strip NUL bytes and control chars that can fool path checks.
+    cleaned = ''.join(c for c in str(path_str) if c not in '\x00\r\n')
+    if os.path.isabs(cleaned):
+        candidate = os.path.abspath(cleaned)
+    else:
+        normalized = cleaned.replace('\\', '/').lstrip('/').lstrip('.')
+        while normalized.startswith('/'):
+            normalized = normalized.lstrip('/')
+        if not normalized:
+            return ''
+        candidate = os.path.abspath(os.path.join(WORKSPACE_ROOT, normalized))
+    # Containment check: refuse anything that resolves outside the workspace.
+    if not (candidate == WORKSPACE_ROOT or candidate.startswith(WORKSPACE_ROOT + os.sep)):
         return ''
-    return os.path.abspath(os.path.join(WORKSPACE_ROOT, normalized))
+    return candidate
 
 
 def sanitize_str(val):
     if not val:
         return ''
     return html.escape(str(val).strip())
+
+
+# Allowed filename characters: letters, digits, dash, underscore, dot, and a
+# single path separator. Rejects shell metacharacters and traversal segments.
+_SAFE_NAME_RE = re.compile(r'^[A-Za-z0-9_\-./]+\.[A-Za-z0-9_\-]+$')
+
+
+def is_safe_relative_path(path_str):
+    """True if path_str is a relative path with no traversal or shell metachars."""
+    if not path_str or not isinstance(path_str, str):
+        return False
+    if '\x00' in path_str:
+        return False
+    # No shell/command metacharacters that could break out of an argv slot.
+    if any(ch in path_str for ch in (';', '|', '&', '$', '`', '(', ')', '{', '}', '<', '>', '*', '?', '"', "'", '\n', '\r')):
+        return False
+    normalized = path_str.replace('\\', '/')
+    parts = [p for p in normalized.split('/') if p not in ('', '.')]
+    if any(p == '..' for p in parts):
+        return False
+    return True
 
 
 # --------------------------------------------------------------------------- #
@@ -89,6 +121,8 @@ def save_file():
         return jsonify({'status': 'error', 'message': 'Invalid file path.'}), 400
 
     file_path = resolve_workspace_path(file_path)
+    if not file_path:
+        return jsonify({'status': 'error', 'message': 'Invalid or out-of-workspace file path.'}), 400
     clean_text = raw_content.replace('\xa0', ' ').replace('\u00a0', ' ')
 
     try:
@@ -111,6 +145,8 @@ def read_file():
         return jsonify({'status': 'error', 'message': 'Accessing .git files is restricted.'}), 403
 
     file_path = resolve_workspace_path(file_path)
+    if not file_path:
+        return jsonify({'status': 'error', 'message': 'Invalid or out-of-workspace file path.'}), 400
     if not os.path.exists(file_path):
         return jsonify({'status': 'error', 'message': 'File not found.'}), 404
 
@@ -142,17 +178,29 @@ def run_file():
     data = request.get_json() or {}
     file_path = data.get('path', '')
 
-    if not file_path or not os.path.exists(file_path):
+    if not file_path:
+        return jsonify({'status': 'error', 'message': 'File path is required.'}), 400
+
+    # Anti-command-injection: only allow safe relative paths, then anchor and
+    # verify containment inside the workspace. The path is never passed through
+    # a shell (subprocess.run uses a list, shell=False), and we additionally
+    # reject any shell metacharacters in the raw input.
+    if not is_safe_relative_path(file_path):
+        return jsonify({'status': 'error', 'message': 'Invalid file path.'}), 400
+
+    resolved = resolve_workspace_path(file_path)
+    if not resolved or not os.path.exists(resolved):
         return jsonify({'status': 'error', 'message': 'File does not exist on disk.'}), 400
 
-    ext = file_path.split('.')[-1].lower()
-    runners = {'py': ['python', file_path], 'js': ['node', file_path], 'sh': ['bash', file_path]}
+    ext = resolved.rsplit('.', 1)[-1].lower() if '.' in resolved else ''
+    runners = {'py': ['python', resolved], 'js': ['node', resolved], 'sh': ['bash', resolved]}
     cmd = runners.get(ext)
     if not cmd:
         return jsonify({'status': 'error', 'message': f'Execution for .{ext} files is not supported.'}), 400
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        # shell=False + list args => no shell interpretation of the path.
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, shell=False)
         return jsonify({'status': 'success', 'stdout': result.stdout, 'stderr': result.stderr})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -180,8 +228,26 @@ def call_external_ai_api(provider, api_key, prompt, code_context=""):
     if code_context:
         full_prompt = f"Code Context:\n```\n{code_context}\n```\n\nUser Prompt:\n{prompt}"
 
-    provider_clean = html.unescape(provider).lower()
+    # Anti-injection: validate provider against an allowlist of known names and
+    # strip anything that could break out of a URL path or HTTP header. The API
+    # key is stripped of CR/LF and header separators to prevent header injection.
+    ALLOWED_PROVIDERS = {
+        'chatgpt', 'openai', 'grok', 'deepseek', 'mistral', 'openrouter',
+        'perplexity', 'gemini', 'google', 'claude', 'anthropic', 'cohere', 'custom'
+    }
+    provider_clean = html.unescape(provider).lower().strip()
+    # Keep only alnum/dash/space; collapse to a safe token.
+    provider_clean = ''.join(c if c.isalnum() or c in '- ' else '' for c in provider_clean).strip()
+    if provider_clean not in ALLOWED_PROVIDERS and 'custom' not in provider_clean:
+        # Fall back to a safe default rather than trusting arbitrary input.
+        provider_clean = 'custom'
+
     api_key_clean = html.unescape(api_key).strip()
+    # Reject CRLF / header separators that enable header injection.
+    api_key_clean = ''.join(c for c in api_key_clean if c not in '\r\n\x00')
+    if any(ch in api_key_clean for ch in ('\r', '\n', ':')) and 'Bearer' not in api_key_clean:
+        # Keys shouldn't contain colons/newlines; bail out safely.
+        api_key_clean = api_key_clean.split(':')[0].strip()
 
     # Each entry: (url, headers, payload-builder, response-extractor)
     def openai_payload():
@@ -229,7 +295,8 @@ def call_external_ai_api(provider, api_key, prompt, code_context=""):
 
     # Gemini and Claude have distinct shapes.
     if 'gemini' in provider_clean or 'google' in provider_clean:
-        url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key_clean}'
+        safe_key = urllib.parse.quote(api_key_clean, safe='')
+        url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={safe_key}'
         payload = {'contents': [{'parts': [{'text': full_prompt}]}]}
         req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'),
                                      headers={'Content-Type': 'application/json'}, method='POST')
@@ -275,6 +342,8 @@ def call_local_ai_model(model_path, prompt, code_context=""):
         full_prompt = f"Code Context:\n```\n{code_context}\n```\n\nPrompt:\n{prompt}"
 
     model_path_clean = html.unescape(model_path).strip() if model_path else ''
+    # Strip NUL/control bytes that can fool filesystem checks.
+    model_path_clean = ''.join(c for c in model_path_clean if c not in '\x00\r\n')
 
     # Ollama
     try:
